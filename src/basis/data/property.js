@@ -702,7 +702,5 @@
   module.exports = {
     DataObjectSet: DataObjectSet,
     AbstractProperty: AbstractProperty,
-    Property: Property,
-
-    PropertySet: DataObjectSet // deprecate
+    Property: Property
   };
