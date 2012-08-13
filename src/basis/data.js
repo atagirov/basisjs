@@ -228,69 +228,14 @@
   //LISTEN.add('target', 'targetChanged');
 
 
-  //
-  // DataObject
-  //
-
- /**
-  * Base class for data storing.
-  * @class
-  */
-  var DataObject = Class(EventObject, {
-    className: namespace + '.DataObject',
+  var AbstractDataObject = Class(EventObject, {
+    className: namespace + '.AbstractDataObject',
 
    /**
     * State of object. Might be managed by delegate object (if used).
     * @type {basis.data.STATE|string}
     */
     state: STATE.READY,
-
-   /**
-    * Using for data storing. Might be managed by delegate object (if used).
-    * @type {Object}
-    */
-    data: null,
-
-   /**
-    * @type {boolean}
-    */
-    canHaveDelegate: true,
-
-   /**
-    * Object that manage data updates if assigned.
-    * @type {basis.data.DataObject}
-    */
-    delegate: null,
-
-   /**
-    * Root of delegate chain. By default and when no delegate, it points to object itself.
-    * @type {basis.data.DataObject}
-    * @readonly
-    */
-    root: null,
-
-   /**
-    * Flag determines object behaviour when assigned delegate is destroing:
-    * - true - destroy object on delegate object destroing (cascade destroy)
-    * - false - don't destroy object, detach delegate only
-    * @type {boolean}
-    */
-    cascadeDestroy: false,
-
-   /**
-    * Flag to determine is this object target object or not. This property
-    * is readonly and can't be changed after init.
-    * @type {boolean}
-    * @readobly
-    */
-    isTarget: false,
-
-   /**
-    * Reference to root delegate if some object in delegate chain marked as targetPoint.
-    * @type {basis.data.DataObject}
-    * @readonly
-    */
-    target: null,
 
    /**
     * Indicates if object influences to related objects or not (is
@@ -323,6 +268,193 @@
     subscribers_: null,
 
    /**
+    * Fires when state or state.data was changed.
+    * @param {basis.data.DataObject} object Object which state was changed.
+    * @param {object} oldState Object state before changes.
+    * @event
+    */
+    event_stateChanged: createEvent('stateChanged', 'oldState'),
+
+   /**
+    * Fires when count of subscribers (subscriberCount property) was changed.
+    * @param {basis.data.DataObject} object Object which subscribers count was changed.
+    * @event
+    */
+    event_subscribersChanged: createEvent('subscribersChanged'),
+
+   /**
+    * Fires when state of subscription was changed.
+    * @event
+    */
+    event_activeChanged: createEvent('activeChanged'),
+
+   /**
+    * @param {Object=} config The configuration of object.
+    * @constructor
+    */
+    init: function(){
+      // inherit
+      EventObject.prototype.init.call(this);
+
+      // subscription sheme: activate subscription if active
+      if (this.active)
+        applySubscription(this, this.subscribeTo, SUBSCRIPTION.ALL);
+    },
+
+   /**
+    * Set new state for object. Fire stateChanged event only if state (or state text) was changed.
+    * @param {basis.data.STATE|string} state New state for object
+    * @param {Object=} data
+    * @param {boolean=} forceEvent Fire stateChanged event even state didn't changed.
+    * @return {boolean} Returns true if state was changed.
+    */
+    setState: function(state, data){
+      var stateCode = String(state);
+
+      if (!STATE_EXISTS[stateCode])
+        throw new Error('Wrong state value');
+
+      // set new state for object
+      if (this.state != stateCode || this.state.data != data)
+      {
+        var oldState = this.state;
+
+        this.state = Object(stateCode);
+        this.state.data = data;
+
+        this.event_stateChanged(oldState);
+
+        return true; // state was changed
+      }
+
+      return false; // state wasn't changed
+    },
+
+   /**
+    * Default action on deprecate, set object state to {basis.data.STATE.DEPRECATED},
+    * but only if object isn't in {basis.data.STATE.PROCESSING} state.
+    */
+    deprecate: function(){
+      if (this.state != STATE.PROCESSING)
+        this.setState(STATE.DEPRECATED);
+    },
+
+   /**
+    * Set new value for isActiveSubscriber property.
+    * @param {boolean} isActive New value for {basis.data.DataObject#active} property.
+    * @return {boolean} Returns true if {basis.data.DataObject#active} was changed.
+    */
+    setActive: function(isActive){
+      isActive = !!isActive;
+
+      if (this.active != isActive)
+      {
+        this.active = isActive;
+        this.event_activeChanged();
+
+        applySubscription(this, this.subscribeTo, SUBSCRIPTION.ALL * isActive);
+
+        return true;
+      }
+
+      return false;
+    },
+
+   /**
+    * Set new value for subscriptionType property.
+    * @param {number} subscriptionType New value for {basis.data.DataObject#subscribeTo} property.
+    * @return {boolean} Returns true if {basis.data.DataObject#subscribeTo} was changed.
+    */
+    setSubscription: function(subscriptionType){
+      var curSubscriptionType = this.subscribeTo;
+      var newSubscriptionType = subscriptionType & SUBSCRIPTION.ALL;
+      var delta = curSubscriptionType ^ newSubscriptionType;
+
+      if (delta)
+      {
+        this.subscribeTo = newSubscriptionType;
+
+        if (this.active)
+          applySubscription(this, delta, newSubscriptionType);
+
+        return true;
+      }
+
+      return false;
+    },
+
+    destroy: function(){
+      // remove subscriptions if necessary
+      if (this.active)
+        applySubscription(this, this.subscribeTo, 0);
+
+      EventObject.prototype.destroy.call(this);
+
+      this.state = STATE.UNDEFINED;
+    }
+  });
+
+  //
+  // DataObject
+  //
+
+ /**
+  * Base class for data storing.
+  * @class
+  */
+  var DataObject = Class(AbstractDataObject, {
+    className: namespace + '.DataObject',
+
+    subscribeTo: SUBSCRIPTION.DELEGATE + SUBSCRIPTION.TARGET,
+
+   /**
+    * Using for data storing. Might be managed by delegate object (if used).
+    * @type {Object}
+    */
+    data: null,
+
+   /**
+    * @type {boolean}
+    */
+    canHaveDelegate: true,
+
+   /**
+    * Flag determines object behaviour when assigned delegate is destroing:
+    * - true - destroy object on delegate object destroing (cascade destroy)
+    * - false - don't destroy object, detach delegate only
+    * @type {boolean}
+    */
+    cascadeDestroy: false,
+
+   /**
+    * Object that manage data updates if assigned.
+    * @type {basis.data.DataObject}
+    */
+    delegate: null,
+
+   /**
+    * Root of delegate chain. By default and when no delegate, it points to object itself.
+    * @type {basis.data.DataObject}
+    * @readonly
+    */
+    root: null,
+
+   /**
+    * Reference to root delegate if some object in delegate chain marked as targetPoint.
+    * @type {basis.data.DataObject}
+    * @readonly
+    */
+    target: null,
+
+   /**
+    * Flag to determine is this object target object or not. This property
+    * is readonly and can't be changed after init.
+    * @type {boolean}
+    * @readobly
+    */
+    isTarget: false,
+
+   /**
     * Fires on data changes.
     * @param {basis.data.DataObject} object Object which data property
     * was changed. Usually it is root of delegate chain.
@@ -332,14 +464,6 @@
     * @event
     */
     event_update: createEvent('update', 'delta'),
-
-   /**
-    * Fires when state or state.data was changed.
-    * @param {basis.data.DataObject} object Object which state was changed.
-    * @param {object} oldState Object state before changes.
-    * @event
-    */
-    event_stateChanged: createEvent('stateChanged', 'oldState'),
 
    /**
     * Fires when delegate was changed.
@@ -364,19 +488,6 @@
     * @event
     */
     event_targetChanged: createEvent('targetChanged', 'oldTarget'),
-
-   /**
-    * Fires when count of subscribers (subscriberCount property) was changed.
-    * @param {basis.data.DataObject} object Object which subscribers count was changed.
-    * @event
-    */
-    event_subscribersChanged: createEvent('subscribersChanged'),
-
-   /**
-    * Fires when state of subscription was changed.
-    * @event
-    */
-    event_activeChanged: createEvent('activeChanged'),
 
    /**
     * Default listeners.
@@ -427,7 +538,7 @@
     */
     init: function(){
       // inherit
-      EventObject.prototype.init.call(this);
+      AbstractDataObject.prototype.init.call(this);
 
       // data/delegate
       var delegate = this.delegate;
@@ -459,11 +570,14 @@
         applySubscription(this, this.subscribeTo, SUBSCRIPTION.ALL);
     },
 
-    /*postInit: function(){
-      // subscription sheme: activate subscription if active
-      if (this.active)
-        applySubscription(this, this.subscribeTo, SUBSCRIPTION.ALL);
-    },*/
+   /**
+    * 
+    */
+    setState: function(state, data){
+      return this.root !== this
+        ? this.root.setState(state, data)
+        : AbstractDataObject.prototype.setState.call(this, state, data);
+    },
 
    /**
     * Returns true if current object is connected to another object through delegate bubbling.
@@ -628,49 +742,6 @@
       return false; // delegate doesn't changed
     },
 
-   /**
-    * Set new state for object. Fire stateChanged event only if state (or state text) was changed.
-    * @param {basis.data.STATE|string} state New state for object
-    * @param {Object=} data
-    * @param {boolean=} forceEvent Fire stateChanged event even state didn't changed.
-    * @return {basis.data.STATE|string} Current object state.
-    */
-    setState: function(state, data){
-      var root = this.target || this.getRootDelegate();
-
-      // set new state for root
-      if (root !== this)
-        return root.setState(state, data);
-
-      var stateCode = String(state);
-
-      if (!STATE_EXISTS[stateCode])
-        throw new Error('Wrong state value');
-
-      // set new state for object
-      if (this.state != stateCode || this.state.data != data)
-      {
-        var oldState = this.state;
-
-        this.state = Object(stateCode);
-        this.state.data = data;
-
-        this.event_stateChanged(oldState);
-
-        return true; // state was changed
-      }
-
-      return false; // state wasn't changed
-    },
-
-   /**
-    * Default action on deprecate, set object state to {basis.data.STATE.DEPRECATED},
-    * but only if object isn't in {basis.data.STATE.PROCESSING} state.
-    */
-    deprecate: function(){
-      if (this.state != STATE.PROCESSING)
-        this.setState(STATE.DEPRECATED);
-    },
 
    /**
     * Handle changing object data. Fires update event only if something was changed. 
@@ -678,10 +749,8 @@
     * @return {Object|boolean} Delta if object data (this.data) was updated or false otherwise.
     */
     update: function(data){
-      var root = this.target || this.getRootDelegate();
-
-      if (root !== this)
-        return root.update(data);
+      if (this.root !== this)
+        return this.root.update(data);
 
       if (data)
       {
@@ -708,68 +777,20 @@
       return false;
     },
 
-   /**
-    * Set new value for isActiveSubscriber property.
-    * @param {boolean} isActive New value for {basis.data.DataObject#active} property.
-    * @return {boolean} Returns true if {basis.data.DataObject#active} was changed.
-    */
-    setActive: function(isActive){
-      isActive = !!isActive;
-
-      if (this.active != isActive)
-      {
-        this.active = isActive;
-        this.event_activeChanged();
-
-        applySubscription(this, this.subscribeTo, SUBSCRIPTION.ALL * isActive);
-
-        return true;
-      }
-
-      return false;
-    },
-
-   /**
-    * Set new value for subscriptionType property.
-    * @param {number} subscriptionType New value for {basis.data.DataObject#subscribeTo} property.
-    * @return {boolean} Returns true if {basis.data.DataObject#subscribeTo} was changed.
-    */
-    setSubscription: function(subscriptionType){
-      var curSubscriptionType = this.subscribeTo;
-      var newSubscriptionType = subscriptionType & SUBSCRIPTION.ALL;
-      var delta = curSubscriptionType ^ newSubscriptionType;
-
-      if (delta)
-      {
-        this.subscribeTo = newSubscriptionType;
-
-        if (this.active)
-          applySubscription(this, delta, newSubscriptionType);
-
-        return true;
-      }
-
-      return false;
-    },
 
    /**
     * @destructor
     */
     destroy: function(){
-      // remove subscriptions if necessary
-      if (this.active)
-        applySubscription(this, this.subscribeTo, 0);
-
       // drop delegate
       if (this.delegate)
         this.setDelegate();
 
       // inherit
-      EventObject.prototype.destroy.call(this);
+      AbstractDataObject.prototype.destroy.call(this);
 
       // drop data & state
       this.data = NULL_OBJECT;
-      this.state = STATE.UNDEFINED;
       this.root = null;
       this.target = null;
     }
@@ -1466,6 +1487,8 @@
     SUBSCRIPTION: SUBSCRIPTION,
 
     // classes
+    AbstractDataObject: AbstractDataObject,
+
     Object: DataObject,
     DataObject: DataObject,
 
