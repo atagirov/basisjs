@@ -33,6 +33,7 @@
 
   var SUBSCRIPTION = nsData.SUBSCRIPTION;
   var DataObject = nsData.DataObject;
+  var AbstractDataObject = nsData.AbstractDataObject;
   var AbstractDataset = nsData.AbstractDataset;
   var Dataset = nsData.Dataset;
 
@@ -711,7 +712,7 @@
     setSatellite: function(name, satellite){
       var oldSatellite = this.satellite[name];
 
-      if (satellite instanceof DataObject == false)
+      if (satellite instanceof AbstractDataObject == false)
         satellite = null;
 
       if (oldSatellite != satellite && !this.satelliteConfig[name])

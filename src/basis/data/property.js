@@ -33,6 +33,7 @@
   var createEvent = basis.event.create;
 
   var nsData = basis.data;
+  var AbstractDataObject = nsData.AbstractDataObject;
   var DataObject = nsData.DataObject;
   var STATE = nsData.STATE;
 
@@ -52,7 +53,7 @@
  /**
   * @class
   */
-  var AbstractProperty = Class(DataObject, {
+  var AbstractProperty = Class(AbstractDataObject, {
     className: namespace + '.AbstractProperty',
 
     event_change: createEvent('change'),
