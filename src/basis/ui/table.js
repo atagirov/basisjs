@@ -256,7 +256,7 @@
         owner: this,
         handlerContext: this,
         handler: {
-          datasetChanged: function(dataset, delta){
+          itemsChanged: function(dataset, delta){
             var cell = dataset.pick();
             if (cell && this.owner)
               this.owner.setSorting(cell.colSorting, cell.order);

@@ -128,7 +128,7 @@
   //
 
   var MERGE_DATASET_HANDLER = {
-    datasetChanged: function(source, delta){
+    itemsChanged: function(source, delta){
       var memberMap = this.members_;
       var updated = {};
       var deleted = [];
@@ -291,7 +291,7 @@
 
       // fire event if delta found
       if (delta = getDelta(inserted, deleted))
-        this.event_datasetChanged(delta);
+        this.event_itemsChanged(delta);
 
       return delta;
     },
@@ -382,7 +382,7 @@
 
    /**
     * Synchonize sources list according new list.
-    * TODO: optimize, reduce event_sourcesChanged and event_datasetChanged count
+    * TODO: optimize, reduce event_sourcesChanged and event_itemsChanged count
     * TODO: returns delta of source list changes
     * @param {Array.<basis.data.AbstractDataset>} sources
     */
@@ -407,7 +407,7 @@
 
    /**
     * Remove all sources. All members are removing as side effect.
-    * TODO: optimize, reduce event_sourcesChanged and event_datasetChanged count
+    * TODO: optimize, reduce event_sourcesChanged and event_itemsChanged count
     */
     clear: function(){
       arrayFrom(this.sources).forEach(this.removeSource, this);
@@ -474,7 +474,7 @@
   };
 
   var SUBTRACTDATASET_MINUEND_HANDLER = {
-    datasetChanged: function(dataset, delta){
+    itemsChanged: function(dataset, delta){
       if (!this.subtrahend)
         return;
 
@@ -484,7 +484,7 @@
       );
       
       if (newDelta)
-        this.event_datasetChanged(newDelta);
+        this.event_itemsChanged(newDelta);
     },
     destroy: function(){
       this.setOperands(null, this.subtrahend);
@@ -492,7 +492,7 @@
   };
 
   var SUBTRACTDATASET_SUBTRAHEND_HANDLER = {
-    datasetChanged: function(dataset, delta){
+    itemsChanged: function(dataset, delta){
       if (!this.minuend)
         return;
 
@@ -502,7 +502,7 @@
       );
 
       if (newDelta)
-        this.event_datasetChanged(newDelta);
+        this.event_itemsChanged(newDelta);
     },
     destroy: function(){
       this.setOperands(this.minuend, null);
@@ -628,7 +628,7 @@
       if (!minuend || !subtrahend)
       {
         if (this.itemCount)
-          this.event_datasetChanged(delta = {
+          this.event_itemsChanged(delta = {
             deleted: this.getItems()
           });
       }
@@ -646,7 +646,7 @@
             inserted.push(minuend.items_[key]);
 
         if (delta = getDelta(inserted, deleted))
-          this.event_datasetChanged(delta);
+          this.event_itemsChanged(delta);
       }
 
       return delta;
@@ -753,13 +753,13 @@
 
         if (listenHandler)
         {
-          var datasetChangedHandler = listenHandler.datasetChanged;
+          var itemsChangedHandler = listenHandler.itemsChanged;
           if (oldSource)
           {
             oldSource.removeHandler(listenHandler, this);
 
-            if (datasetChangedHandler)
-              datasetChangedHandler.call(this, oldSource, {
+            if (itemsChangedHandler)
+              itemsChangedHandler.call(this, oldSource, {
                 deleted: oldSource.getItems()
               });
           }
@@ -768,8 +768,8 @@
           {
             source.addHandler(listenHandler, this);
 
-            if (datasetChangedHandler)
-              datasetChangedHandler.call(this, source, {
+            if (itemsChangedHandler)
+              itemsChangedHandler.call(this, source, {
                 inserted: source.getItems()
               });
           }
@@ -870,12 +870,12 @@
 
       // fire event, if any delta
       if (delta = getDelta(inserted, deleted))
-        this.event_datasetChanged(delta);
+        this.event_itemsChanged(delta);
     }
   };
 
   var MAPREDUCE_SOURCE_HANDLER = {
-    datasetChanged: function(source, delta){
+    itemsChanged: function(source, delta){
       var sourceMap = this.sourceMap_;
       var memberMap = this.members_;
       var inserted = [];
@@ -953,7 +953,7 @@
       Dataset.setAccumulateState(false);
 
       if (delta = getDelta(inserted, deleted))
-        this.event_datasetChanged(delta);
+        this.event_itemsChanged(delta);
     }
   };
 
@@ -1143,7 +1143,7 @@
 
       // if any changes, fire event
       if (delta = getDelta(inserted, deleted))
-        this.event_datasetChanged(delta);
+        this.event_itemsChanged(delta);
 
       return delta;
     }
@@ -1215,14 +1215,14 @@
     * @inheritDoc
     */
     addMemberRef: function(subset, sourceObject){
-      subset.event_datasetChanged({ inserted: [sourceObject] });
+      subset.event_itemsChanged({ inserted: [sourceObject] });
     },
 
    /**
     * @inheritDoc
     */
     removeMemberRef: function(subset, sourceObject){
-      subset.event_datasetChanged({ deleted: [sourceObject] });
+      subset.event_itemsChanged({ deleted: [sourceObject] });
     },
 
    /**
@@ -1335,7 +1335,7 @@
   }
 
   var SLICE_SOURCE_HANDLER = {
-    datasetChanged: function(source, delta){
+    itemsChanged: function(source, delta){
       var sourceMap = this.sourceMap_;
       var index = this.index_;
       var updateHandler = this.ruleEvents;
@@ -1561,7 +1561,7 @@
       }
 
       if (delta = getDelta(inserted, values(curSet)))
-        this.event_datasetChanged(delta);
+        this.event_itemsChanged(delta);
 
       return delta;
     },
@@ -1608,7 +1608,7 @@
 
           if (!oldList[subsetId])
           {
-            subset.event_datasetChanged({ inserted: [sourceObject] });
+            subset.event_itemsChanged({ inserted: [sourceObject] });
 
             if (!memberMap[subsetId])
             {
@@ -1626,7 +1626,7 @@
       if (!newList[subsetId])
       {
         var subset = oldList[subsetId];
-        subset.event_datasetChanged({ deleted: [sourceObject] });
+        subset.event_itemsChanged({ deleted: [sourceObject] });
 
         if (!--memberMap[subsetId])
         {
@@ -1636,11 +1636,11 @@
       }
 
     if (delta = getDelta(inserted, deleted))
-      this.event_datasetChanged(delta);
+      this.event_itemsChanged(delta);
   };
 
   var CLOUD_SOURCE_HANDLER = {
-    datasetChanged: function(dataset, delta){
+    itemsChanged: function(dataset, delta){
       var sourceMap = this.sourceMap_;
       var memberMap = this.members_;
       var updateHandler = this.ruleEvents;
@@ -1674,7 +1674,7 @@
                 subsetId = subset.eventObjectId;
                 sourceObjectInfo.list[subsetId] = subset;
 
-                subset.event_datasetChanged({ inserted: [sourceObject] });
+                subset.event_itemsChanged({ inserted: [sourceObject] });
 
                 if (!memberMap[subsetId])
                 {
@@ -1701,7 +1701,7 @@
           for (var subsetId in list)
           {
             var subset = list[subsetId];
-            subset.event_datasetChanged({ deleted: [sourceObject] });
+            subset.event_itemsChanged({ deleted: [sourceObject] });
 
             if (!--memberMap[subsetId])
             {
@@ -1717,7 +1717,7 @@
       Dataset.setAccumulateState(false);
 
       if (delta = getDelta(inserted, deleted))
-        this.event_datasetChanged(delta);
+        this.event_itemsChanged(delta);
     }
   };
 

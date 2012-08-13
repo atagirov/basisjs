@@ -397,7 +397,7 @@
   });
 
   windowManager.selection.addHandler({
-    datasetChanged: function(){
+    itemsChanged: function(){
       var selected = this.pick();
       var lastWin = windowManager.lastChild;
       if (selected)

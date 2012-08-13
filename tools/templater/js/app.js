@@ -49,7 +49,7 @@ basis.require('basis.ui');
 
         // tree.selection -> editor
         filelist().tree.selection.addHandler({
-          datasetChanged: function(selection, delta){
+          itemsChanged: function(selection, delta){
             this.setSourceFile(selection.pick());
           }
         }, editor());

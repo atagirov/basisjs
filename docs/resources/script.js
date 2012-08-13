@@ -234,7 +234,7 @@
   var navTree = new nsTree.Tree({
     selection: {
       handler: {
-        datasetChanged: function(dataset, delta){
+        itemsChanged: function(dataset, delta){
           var selected = this.pick();
           if (selected)
           {

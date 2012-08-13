@@ -660,7 +660,7 @@
   });
 
   var COMPLEXFIELD_SELECTION_HANDLER = {
-    datasetChanged: function(){
+    itemsChanged: function(){
       this.event_change();
     }
   }
@@ -966,7 +966,7 @@
       });
       this.setSatellite('captionItem', captionItem);
       this.selection.addHandler({
-        datasetChanged: function(){
+        itemsChanged: function(){
           captionItem.setDelegate(this.pick());
         }
       });

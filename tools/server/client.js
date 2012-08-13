@@ -221,7 +221,7 @@
       return object.data.type == 'file';
     },
     handler: {
-      datasetChanged: function(dataset, delta){
+      itemsChanged: function(dataset, delta){
         var array;
 
         if (array = delta.inserted)

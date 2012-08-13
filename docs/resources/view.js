@@ -153,7 +153,7 @@
 
     selection: {
       handler: {
-        datasetChanged: function(){
+        itemsChanged: function(){
           var node = this.pick();
 
           if (node && node.handler)

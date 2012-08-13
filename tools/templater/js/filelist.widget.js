@@ -33,7 +33,7 @@
 
   var updatedNodes = new nsData.Dataset({
     handler: {
-      datasetChanged: function(dataset, delta){
+      itemsChanged: function(dataset, delta){
         var array;
 
         if (array = delta.inserted)

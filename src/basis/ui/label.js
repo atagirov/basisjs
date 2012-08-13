@@ -265,7 +265,7 @@
     listen: {
       ownerDataSource: {
         stateChanged: condChangedTrigger,
-        datasetChanged: condChangedTrigger
+        itemsChanged: condChangedTrigger
       }
     }
   });

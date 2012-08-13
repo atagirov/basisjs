@@ -376,7 +376,7 @@
 
     selection: {
       handler: {
-        datasetChanged: function(object, delta){
+        itemsChanged: function(object, delta){
           /*var selected = this.pick();
           var start = DOM.getSelectionStart(sourceField.tmpl.field);
           var end = start;

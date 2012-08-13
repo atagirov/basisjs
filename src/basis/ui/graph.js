@@ -220,7 +220,7 @@
   // Series Graph
   //
   var SERIES_SOURCE_HANDLER = {
-    datasetChanged: function(object, delta){
+    itemsChanged: function(object, delta){
       var key;
       var value;
       var valuesDelta = [];
@@ -318,14 +318,14 @@
         if (oldSource)
         {
           oldSource.removeHandler(SERIES_SOURCE_HANDLER, this);
-          SERIES_SOURCE_HANDLER.datasetChanged.call(this, oldSource, { deleted: oldSource.getItems() });
+          SERIES_SOURCE_HANDLER.itemsChanged.call(this, oldSource, { deleted: oldSource.getItems() });
         }
 
         this.source = source;
         if (this.source)
         {
           this.source.addHandler(SERIES_SOURCE_HANDLER, this);
-          SERIES_SOURCE_HANDLER.datasetChanged.call(this, oldSource, { inserted: this.source.getItems() });
+          SERIES_SOURCE_HANDLER.itemsChanged.call(this, oldSource, { inserted: this.source.getItems() });
         }
 
         this.event_sourceChanged(oldSource);
@@ -1060,7 +1060,7 @@
   }
 
   var GRAPH_SELECTION_HANDLER = {
-    datasetChanged: function(object, delta){
+    itemsChanged: function(object, delta){
       this.draw();
     }
   }
