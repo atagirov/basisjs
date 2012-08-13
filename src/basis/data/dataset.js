@@ -8,7 +8,7 @@
   * - Classes:
   *   {basis.data.dataset.Merge}, {basis.data.dataset.Subtract},
   *   {basis.data.dataset.MapReduce}, {basis.data.dataset.Subset},
-  *   {basis.data.dataset.Split}, {basis.data.dataset.Slice}
+  *   {basis.data.dataset.Split}, {basis.data.dataset.Slice},
   *   {basis.data.dataset.Cloud}
   *
   * @see ./demo/defile/dataset.html
@@ -1260,9 +1260,20 @@
     * Fetch subset dataset by some data.
     * @param {basis.data.DataObject|Object} data
     * @param {boolean} autocreate
-    * @return {basis.data.DataObject}
+    * @return {basis.data.AbstractDataset}
     */
     getSubset: function(data, autocreate){
+      var obj = this.getSubsetObject(data, autocreate);
+      return obj && obj.dataset;
+    },
+
+   /**
+    * Fetch subset dataset by some data.
+    * @param {basis.data.DataObject|Object} data
+    * @param {boolean} autocreate
+    * @return {basis.data.DataObject}
+    */
+    getSubsetObject: function(data, autocreate){
       return this.keyMap.get(data, autocreate);
     },
 
@@ -1803,9 +1814,20 @@
     * Fetch subset dataset by some data.
     * @param {basis.data.DataObject|Object} data
     * @param {boolean} autocreate
-    * @return {basis.data.DataObject}
+    * @return {basis.data.AbstractDataset}
     */
     getSubset: function(data, autocreate){
+      var obj = this.getSubsetObject(data, autocreate);
+      return obj && obj.dataset;
+    },
+
+   /**
+    * Fetch subset dataset by some data.
+    * @param {basis.data.DataObject|Object} data
+    * @param {boolean} autocreate
+    * @return {basis.data.DataObject}
+    */
+    getSubsetObject: function(data, autocreate){
       return this.keyMap.get(data, autocreate);
     },
 

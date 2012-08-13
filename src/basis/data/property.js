@@ -8,10 +8,9 @@
 
  /**
   * Namespace overview:
-  * - {basis.data.property.DataObjectSet}
   * - {basis.data.property.AbstractProperty}
   * - {basis.data.property.Property}
-  * - {basis.data.property.PropertySet} as aliases for {basis.data.property.DataObjectSet}
+  * - {basis.data.property.DataObjectSet}
   *
   * @namespace basis.data.property
   */
@@ -43,7 +42,7 @@
 
   // Module exceptions
 
-  /** @const */ var EXCEPTION_DATAOBJECT_REQUIRED = namespace + ': Instance of DataObject required';
+  /** @const */ var EXCEPTION_DATAOBJECT_REQUIRED = namespace + ': Instance of AbstractDataObject required';
   /** @const */ var EXCEPTION_BAD_OBJECT_LINK = namespace + ': Link to undefined object ignored';
 
   //
@@ -84,7 +83,7 @@
     * @constructor
     */
     init: function(initValue, handlers, proxy){
-      DataObject.prototype.init.call(this, {});
+      AbstractDataObject.prototype.init.call(this, {});
       if (handlers)
         this.addHandler(handlers);
 
@@ -165,7 +164,7 @@
     * @destructor
     */
     destroy: function(){
-      DataObject.prototype.destroy.call(this);
+      AbstractDataObject.prototype.destroy.call(this);
 
       delete this.initValue;
       delete this.proxy;
@@ -502,7 +501,7 @@
     },
 
    /**
-    * @type {Array.<basis.data.DataObject>}
+    * @type {Array.<basis.data.AbstractDataObject>}
     */
     objects: null,
 
@@ -541,7 +540,7 @@
     * @config {boolean} calculateOnInit
     * @config {function()} proxy
     * @config {function()} calculateValue
-    * @config {Array.<basis.data.DataObject>} objects
+    * @config {Array.<basis.data.AbstractDataObject>} objects
     * @constructor
     */
     init: function(){
@@ -565,14 +564,14 @@
     },
 
    /**
-    * Adds one or more DataObject instances to objects collection.
-    * @param {...basis.data.DataObject} args
+    * Adds one or more AbstractDataObject instances to objects collection.
+    * @param {...basis.data.AbstractDataObject} args
     */
     add: function(/* dataObject1 .. dataObjectN */){
       for (var i = 0, len = arguments.length; i < len; i++)
       {
         var object = arguments[i];
-        if (object instanceof DataObject)
+        if (object instanceof AbstractDataObject)
         {
           if (this.objects.add(object))
             object.addHandler(DataObjectSetHandlers, this);
@@ -585,8 +584,8 @@
     },
 
    /**
-    * Removes DataObject instance from objects collection.
-    * @param {basis.data.DataObject} object
+    * Removes AbstractDataObject instance from objects collection.
+    * @param {basis.data.AbstractDataObject} object
     */
     remove: function(object){
       if (this.objects.remove(object))
@@ -596,7 +595,7 @@
     },
 
    /**
-    * Removes all DataObject instances from objects collection.
+    * Removes all AbstractDataObject instances from objects collection.
     */
     clear: function(){
       for (var i = 0, object; object = this.objects[i]; i++)
@@ -704,5 +703,6 @@
     DataObjectSet: DataObjectSet,
     AbstractProperty: AbstractProperty,
     Property: Property,
-    PropertySet: DataObjectSet
+
+    PropertySet: DataObjectSet // deprecate
   };
