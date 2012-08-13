@@ -220,6 +220,20 @@
     }
   );
 
+  SUBSCRIPTION.add(
+    'DATASET',
+    {
+      datasetChanged: function(object, oldDataset){
+        this.remove(object, oldDataset);
+        this.add(object, object.dataset);
+      }
+    },
+    function(action, object){
+      action(object, object.dataset);
+    }
+  );
+
+
   //
   // reg new type of listen
   //
@@ -228,6 +242,10 @@
   //LISTEN.add('target', 'targetChanged');
 
 
+ /**
+  * Base class for data classes.
+  * @class
+  */
   var AbstractDataObject = Class(EventObject, {
     className: namespace + '.AbstractDataObject',
 
@@ -249,7 +267,7 @@
     * related objects (delegate, source, dataSource etc).
     * @type {basis.data.SUBSCRIPTION|number}
     */
-    subscribeTo: SUBSCRIPTION.DELEGATE + SUBSCRIPTION.TARGET,
+    subscribeTo: SUBSCRIPTION.NONE,
 
    /**
     * Count of subscribed objects. This property can use to determinate
@@ -269,7 +287,6 @@
 
    /**
     * Fires when state or state.data was changed.
-    * @param {basis.data.DataObject} object Object which state was changed.
     * @param {object} oldState Object state before changes.
     * @event
     */
@@ -277,7 +294,6 @@
 
    /**
     * Fires when count of subscribers (subscriberCount property) was changed.
-    * @param {basis.data.DataObject} object Object which subscribers count was changed.
     * @event
     */
     event_subscribersChanged: createEvent('subscribersChanged'),
@@ -289,7 +305,6 @@
     event_activeChanged: createEvent('activeChanged'),
 
    /**
-    * @param {Object=} config The configuration of object.
     * @constructor
     */
     init: function(){
@@ -394,17 +409,17 @@
     }
   });
 
-  //
-  // DataObject
-  //
 
  /**
-  * Base class for data storing.
+  * Key-value storage.
   * @class
   */
   var DataObject = Class(AbstractDataObject, {
     className: namespace + '.DataObject',
 
+   /**
+    * Set default subscription.
+    */
     subscribeTo: SUBSCRIPTION.DELEGATE + SUBSCRIPTION.TARGET,
 
    /**
@@ -456,8 +471,6 @@
 
    /**
     * Fires on data changes.
-    * @param {basis.data.DataObject} object Object which data property
-    * was changed. Usually it is root of delegate chain.
     * @param {object} delta Delta of changes. Keys in delta are property
     * names that was changed, and values is previous value of property
     * (value of property before changes).
@@ -467,7 +480,6 @@
 
    /**
     * Fires when delegate was changed.
-    * @param {basis.data.DataObject} object Object which state was changed.
     * @param {basis.data.DataObject} oldDelegate Object delegate before changes.
     * @event
     */
@@ -475,7 +487,6 @@
 
    /**
     * Fires when root of delegate chain was changed.
-    * @param {basis.data.DataObject} object Object which root was changed.
     * @param {basis.data.DataObject} oldRoot Object root before changes.
     * @event
     */
@@ -483,7 +494,6 @@
 
    /**
     * Fires when target property was changed.
-    * @param {basis.data.DataObject} object Object which target property was changed.
     * @param {basis.data.DataObject} oldTarget Object before changes.
     * @event
     */
@@ -802,7 +812,7 @@
 
   var KEYOBJECTMAP_MEMBER_HANDLER = {
     destroy: function(object){
-      delete this.map[this.itemId];
+      delete this.map[this.key];
     }
   };
 
@@ -851,7 +861,7 @@
         item = this.map_[itemId] = this.create(key, object);
         item.addHandler(KEYOBJECTMAP_MEMBER_HANDLER, {
           map: this.map_,
-          itemId: itemId
+          key: itemId
         });
       }
 
@@ -865,6 +875,7 @@
         item.destroy();
     }
   });
+
 
   //
   // Datasets
@@ -890,17 +901,11 @@
  /**
   * @class
   */
-  var AbstractDataset = Class(DataObject, {
+  var AbstractDataset = Class(AbstractDataObject, {
     className: namespace + '.AbstractDataset',
 
    /**
-    * Datasets can't have delegate by default.
-    * @inheritDoc
-    */
-    //canHaveDelegate: false, // ????
-
-   /**
-    * Default state for set is undefined. It useful to trigger dataset update
+    * Default state for dataset is undefined. It useful to trigger dataset update
     * on demand.
     * @inheritDoc
     */
@@ -963,7 +968,6 @@
 
    /**
     * Fires when items changed.
-    * @param {basis.data.AbstractDataset} dataset
     * @param {Object} delta Delta of changes. Must have property `inserted`
     * or `deleted`, or both of them. `inserted` property is array of new items
     * and `deleted` property is array of removed items.
@@ -1135,9 +1139,95 @@
     }
   });
 
-  //
-  // Dataset
-  //
+ /**
+  * @class
+  */
+  var DatasetObject = Class(DataObject, {
+    className: namespace + '.DatasetObject',
+
+    subscribeTo: SUBSCRIPTION.DELEGATE + SUBSCRIPTION.TARGET + SUBSCRIPTION.DATASET,
+
+    listen: {
+      dataset: {
+        itemsChanged: function(dataset, delta){
+          this.itemCount = dataset.itemCount;
+          this.event_itemsChanged(dataset, delta);
+        },
+        destroy: function(){
+          this.setDataset();
+        }
+      }
+    },
+
+   /**
+    * @type {basis.data.AbstractDataset}
+    */
+    dataset: null,
+
+   /**
+    * Fires when dataset was changed.
+    * @param {basis.data.AbstractDataset} oldDataset
+    * @event
+    */
+    event_datasetChanged: createEvent('datasetChanged', 'oldDataset'),
+
+   /**
+    * Proxy event of dataset. Fires when items of dataset was changed.
+    * @param {object} delta
+    * @event
+    */
+    event_itemsChanged: createEvent('itemsChanged', 'delta'),
+
+   /**
+    * @constructor
+    */
+    init: function(){
+      var dataset = this.dataset;
+      if (dataset)
+      {
+        this.dataset = null;
+        this.setDataset(dataset);
+      }
+
+      DataObject.prototype.init.call(this);
+    },
+
+   /**
+    * @param {basis.data.AbstractDataset} dataset
+    */
+    setDataset: function(dataset){
+      if (dataset instanceof AbstractDataset == false)
+        dataset = null;
+      
+      if (this.dataset !== dataset)
+      {
+        var listenHandler = this.listen.dataset;
+        var oldDataset = this.dataset;
+
+        if (listenHandler)
+        {
+          if (oldDataset)
+            oldDataset.removeHandler(listenHandler, this);
+          if (dataset)
+            dataset.addHandler(listenHandler, this);
+        }
+
+        this.dataset = dataset;
+        this.event_datasetChanged(oldDataset);
+      }
+    },
+
+   /**
+    * @destructor
+    */
+    destroy: function(){
+      if (this.dataset)
+        this.setDataset();
+
+      DataObject.prototype.destroy.call(this);
+    }
+  });
+
 
  /**
   * @class
@@ -1495,5 +1585,6 @@
     KeyObjectMap: KeyObjectMap,
 
     AbstractDataset: AbstractDataset,
+    DatasetObject: DatasetObject,
     Dataset: Dataset
   };

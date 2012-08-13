@@ -39,6 +39,7 @@
   var KeyObjectMap = basis.data.KeyObjectMap;
   var AbstractDataset = basis.data.AbstractDataset;
   var Dataset = basis.data.Dataset;
+  var DatasetObject = basis.data.DatasetObject;
 
 
   //
@@ -121,6 +122,18 @@
 
     if (result)
       return delta;
+  }
+
+  function createKeyMap(config, keyGetter, itemClass, subsetClass){
+    return new KeyObjectMap(extend({
+      keyGetter: keyGetter,
+      itemClass: itemClass,
+      create: function(key, object){
+        var obj = KeyObjectMap.prototype.create.call(this, key, object);
+        obj.setDataset(new subsetClass());
+        return obj;
+      }
+    }, config));
   }
 
   //
@@ -1180,9 +1193,16 @@
     className: namespace + '.Split',
 
    /**
-    * @type {basis.data.AbstractDataset}
+    * Class for subset
+    * @type {function}
     */
     subsetClass: AbstractDataset,
+
+   /**
+    * Class for subset wrapper
+    * @type {function}
+    */
+    subsetWrapperClass: DatasetObject,
 
    /**
     * @type {basis.data.KeyObjectMap}
@@ -1214,15 +1234,15 @@
    /**
     * @inheritDoc
     */
-    addMemberRef: function(subset, sourceObject){
-      subset.event_itemsChanged({ inserted: [sourceObject] });
+    addMemberRef: function(wrapper, sourceObject){
+      wrapper.dataset.event_itemsChanged({ inserted: [sourceObject] });
     },
 
    /**
     * @inheritDoc
     */
-    removeMemberRef: function(subset, sourceObject){
-      subset.event_itemsChanged({ deleted: [sourceObject] });
+    removeMemberRef: function(wrapper, sourceObject){
+      wrapper.dataset.event_itemsChanged({ deleted: [sourceObject] });
     },
 
    /**
@@ -1230,10 +1250,7 @@
     */ 
     init: function(){
       if (!this.keyMap || this.keyMap instanceof KeyObjectMap == false)
-        this.keyMap = new KeyObjectMap(extend({
-          keyGetter: this.rule,
-          itemClass: this.subsetClass
-        }, this.keyMap));
+        this.keyMap = createKeyMap(this.keyMap, this.rule, this.subsetWrapperClass, this.subsetClass);
 
       // inherit
       MapReduce.prototype.init.call(this);
@@ -1669,12 +1686,12 @@
             {
               subset = this.keyMap.get(list[j], true);
 
-              if (subset && !subset.has(sourceObject))
+              if (subset && !subset.dataset.has(sourceObject))
               {
                 subsetId = subset.eventObjectId;
                 sourceObjectInfo.list[subsetId] = subset;
 
-                subset.event_itemsChanged({ inserted: [sourceObject] });
+                subset.dataset.event_itemsChanged({ inserted: [sourceObject] });
 
                 if (!memberMap[subsetId])
                 {
@@ -1701,7 +1718,7 @@
           for (var subsetId in list)
           {
             var subset = list[subsetId];
-            subset.event_itemsChanged({ deleted: [sourceObject] });
+            subset.dataset.event_itemsChanged({ deleted: [sourceObject] });
 
             if (!--memberMap[subsetId])
             {
@@ -1728,9 +1745,16 @@
     className: namespace + '.Cloud',
 
    /**
-    * @type {basis.data.AbstractDataset}
+    * Class for subset
+    * @type {function}
     */
     subsetClass: AbstractDataset,
+
+   /**
+    * Class for subset wrapper
+    * @type {function}
+    */
+    subsetWrapperClass: DatasetObject,
     
    /**
     * @type {function(basis.data.DataObject)}
@@ -1769,10 +1793,7 @@
     */ 
     init: function(){
       if (!this.keyMap || this.keyMap instanceof KeyObjectMap == false)
-        this.keyMap = new KeyObjectMap(extend({
-          keyGetter: this.map,
-          itemClass: this.subsetClass
-        }, this.keyMap));
+        this.keyMap = createKeyMap(this.keyMap, this.rule, this.subsetWrapperClass, this.subsetClass);
 
       // inherit
       SourceDatasetMixin.init.call(this);

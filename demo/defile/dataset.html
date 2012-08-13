@@ -406,7 +406,7 @@
 
         childClass: DatasetViewer.prototype.childClass,
         init: function(){
-          this.dataSource = this.delegate;
+          this.dataSource = this.delegate.dataset;
           UIContainer.prototype.init.call(this);
         }
       })
@@ -448,7 +448,7 @@
 
         childClass: DatasetViewer.prototype.childClass,
         init: function(){
-          this.dataSource = this.delegate;
+          this.dataSource = this.delegate.dataset;
           UIContainer.prototype.init.call(this);
         }
       })
