@@ -917,7 +917,7 @@
     * Set of members. 
     * @private
     */
-    item_: null,
+    items_: null,
 
    /**
     * Set of all items, even items are not in member set. May be used as storage for
@@ -926,7 +926,7 @@
     * @type {Object}
     * @private
     */
-    memberMap_: null,
+    members_: null,
 
    /**
     * Cache array of members, for getItems method.
@@ -980,7 +980,7 @@
       {
         while (object = items[insertCount])
         {
-          this.item_[object.eventObjectId] = object;
+          this.items_[object.eventObjectId] = object;
           insertCount++;
         }
       }
@@ -990,7 +990,7 @@
       {
         while (object = items[deleteCount])
         {
-          delete this.item_[object.eventObjectId];
+          delete this.items_[object.eventObjectId];
           deleteCount++;
         }
       }
@@ -1015,8 +1015,8 @@
       if (this.syncAction)
         this.setSyncAction(this.syncAction);
 
-      this.memberMap_ = {};
-      this.item_ = {};
+      this.members_ = {};
+      this.items_ = {};
     },
 
    /**
@@ -1025,7 +1025,7 @@
     * @return {boolean} Returns true if object in dataset.
     */
     has: function(object){
-      return !!(object && this.item_[object.eventObjectId]);
+      return !!(object && this.items_[object.eventObjectId]);
     },
 
    /**
@@ -1034,7 +1034,7 @@
     */
     getItems: function(){
       if (!this.cache_)
-        this.cache_ = values(this.item_);
+        this.cache_ = values(this.items_);
 
       return this.cache_;
     },
@@ -1044,8 +1044,8 @@
     * @return {basis.data.DataObject}
     */
     pick: function(){
-      for (var objectId in this.item_)
-        return this.item_[objectId];
+      for (var objectId in this.items_)
+        return this.items_[objectId];
 
       return null;
     },
@@ -1059,8 +1059,8 @@
       var result = [];
 
       if (count)
-        for (var objectId in this.item_)
-          if (result.push(this.item_[objectId]) >= count)
+        for (var objectId in this.items_)
+          if (result.push(this.items_[objectId]) >= count)
             break;
 
       return result;
@@ -1130,8 +1130,8 @@
       this.cache_ = EMPTY_ARRAY;  // empty array here, to prevent recalc cache
       this.itemCount = 0;
 
-      this.memberMap_ = null;
-      this.item_ = null;
+      this.members_ = null;
+      this.items_ = null;
     }
   });
 
@@ -1174,7 +1174,7 @@
 
     add: function(data){
       var delta;
-      var memberMap = this.memberMap_;
+      var memberMap = this.members_;
       var inserted = [];
       var listenHandler = this.listen.item;
 
@@ -1209,7 +1209,7 @@
 
     remove: function(data){
       var delta;
-      var memberMap = this.memberMap_;
+      var memberMap = this.members_;
       var deleted = [];
       var listenHandler = this.listen.item;
 
@@ -1254,7 +1254,7 @@
       // main part
 
       // build map for new data
-      var memberMap = this.memberMap_;
+      var memberMap = this.members_;
       var exists = {};  // unique input DataObject's
       var deleted = [];
       var inserted = [];
@@ -1314,7 +1314,7 @@
 
       Dataset.setAccumulateState(true);
 
-      var memberMap = this.memberMap_;
+      var memberMap = this.members_;
       var object;
       var objectId;
       var exists = {};
@@ -1336,10 +1336,10 @@
         }
       }
 
-      for (var objectId in this.item_)
+      for (var objectId in this.items_)
       {
         if (!exists[objectId])
-          this.item_[objectId].destroy();
+          this.items_[objectId].destroy();
       }
 
       if (set && inserted.length)
@@ -1365,7 +1365,7 @@
           deleted: deleted
         });
          
-        this.memberMap_ = {};
+        this.members_ = {};
       }
 
       return delta;

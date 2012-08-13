@@ -129,7 +129,7 @@
 
   var MERGE_DATASET_HANDLER = {
     datasetChanged: function(source, delta){
-      var memberMap = this.memberMap_;
+      var memberMap = this.members_;
       var updated = {};
       var deleted = [];
 
@@ -262,7 +262,7 @@
     * @return {Object} Delta of member changes.
     */
     applyRule: function(scope){
-      var memberMap = this.memberMap_;
+      var memberMap = this.members_;
       var rule = this.rule;
       var sourceCount = this.sources.length;
       var inserted = [];
@@ -279,7 +279,7 @@
         memberCounter = memberMap[objectId];
         isMember = sourceCount && memberCounter.count && rule(memberCounter.count, sourceCount);
 
-        if (isMember != !!this.item_[objectId])
+        if (isMember != !!this.items_[objectId])
           (isMember
             ? inserted // not in items -> insert
             : deleted  // already in items -> delete
@@ -311,8 +311,8 @@
             source.addHandler(this.listen.source, this);
 
           // process new source objects and update member map
-          var memberMap = this.memberMap_;
-          for (var objectId in source.item_)
+          var memberMap = this.members_;
+          for (var objectId in source.items_)
           {
             // check: is this object already known
             if (memberMap[objectId])
@@ -325,7 +325,7 @@
               // add to source map
               memberMap[objectId] = {
                 count: 1,
-                object: source.item_[objectId]
+                object: source.items_[objectId]
               };
             }
           }
@@ -360,8 +360,8 @@
           source.removeHandler(this.listen.source, this);
 
         // process removing source objects and update member map
-        var memberMap = this.memberMap_;
-        for (var objectId in source.item_)
+        var memberMap = this.members_;
+        for (var objectId in source.items_)
           memberMap[objectId].count--;
 
         // build delta and fire event
@@ -637,13 +637,13 @@
         var deleted = [];
         var inserted = [];
 
-        for (var key in this.item_)
-          if (!minuend.item_[key] || subtrahend.item_[key])
-            deleted.push(this.item_[key]);
+        for (var key in this.items_)
+          if (!minuend.items_[key] || subtrahend.items_[key])
+            deleted.push(this.items_[key]);
 
-        for (var key in minuend.item_)
-          if (!this.item_[key] && !subtrahend.item_[key])
-            inserted.push(minuend.item_[key]);
+        for (var key in minuend.items_)
+          if (!this.items_[key] && !subtrahend.items_[key])
+            inserted.push(minuend.items_[key]);
 
         if (delta = getDelta(inserted, deleted))
           this.event_datasetChanged(delta);
@@ -814,7 +814,7 @@
     // if member ref is changed
     if (curMember !== newMember)
     {
-      var memberMap = this.memberMap_;
+      var memberMap = this.members_;
       var delta;
       var inserted;
       var deleted;
@@ -877,7 +877,7 @@
   var MAPREDUCE_SOURCE_HANDLER = {
     datasetChanged: function(source, delta){
       var sourceMap = this.sourceMap_;
-      var memberMap = this.memberMap_;
+      var memberMap = this.members_;
       var inserted = [];
       var deleted = [];
       var sourceObject;
@@ -1068,7 +1068,7 @@
     */
     applyRule: function(){
       var sourceMap = this.sourceMap_;
-      var memberMap = this.memberMap_;
+      var memberMap = this.members_;
       var curMember;
       var newMember;
       var curMemberId;
@@ -1134,11 +1134,11 @@
       }
 
       // get deleted delta
-      for (var curMemberId in this.item_)
+      for (var curMemberId in this.items_)
         if (memberMap[curMemberId] == 0)
         {
           delete memberMap[curMemberId];
-          deleted.push(this.item_[curMemberId]);
+          deleted.push(this.items_[curMemberId]);
         }
 
       // if any changes, fire event
@@ -1546,7 +1546,7 @@
         end = start + this.limit;
       }
 
-      var curSet = Object.slice(this.item_);
+      var curSet = Object.slice(this.items_);
       var newSet = this.index_.slice(Math.max(0, start), Math.max(0, end));
       var inserted = [];
       var delta;
@@ -1585,7 +1585,7 @@
 
   var CLOUD_SOURCEOBJECT_UPDATE = function(sourceObject){
     var sourceMap = this.sourceMap_;
-    var memberMap = this.memberMap_;
+    var memberMap = this.members_;
     var sourceObjectId = sourceObject.eventObjectId;
 
     var oldList = sourceMap[sourceObjectId].list;
@@ -1642,7 +1642,7 @@
   var CLOUD_SOURCE_HANDLER = {
     datasetChanged: function(dataset, delta){
       var sourceMap = this.sourceMap_;
-      var memberMap = this.memberMap_;
+      var memberMap = this.members_;
       var updateHandler = this.ruleEvents;
       var objectInfo;
       var array;
