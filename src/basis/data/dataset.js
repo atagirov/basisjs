@@ -74,43 +74,8 @@
     }
   );
 
-  SUBSCRIPTION.add(
-    'MINUEND',
-    {
-      operandsChanged: function(object, oldMinuend){
-        if (this.minuend !== oldMinuend)
-        {
-          if (oldMinuend)
-            SUBSCRIPTION.unlink('minuend', object, oldMinuend);
-          if (object.minuend)
-            SUBSCRIPTION.link('minuend', object, object.minuend);
-        }
-      }
-    },
-    function(action, object){
-      if (object.minuend)
-        action('minuend', object, object.minuend);
-    }
-  );
-
-  SUBSCRIPTION.add(
-    'SUBTRAHEND',
-    {
-      operandsChanged: function(object, oldMinuend, oldSubtrahend){
-        if (this.subtrahend !== oldSubtrahend)
-        {
-          if (oldSubtrahend)
-            SUBSCRIPTION.unlink('subtrahend', object, oldSubtrahend);
-          if (object.subtrahend)
-            SUBSCRIPTION.link('subtrahend', object, object.subtrahend);
-        }
-      }
-    },
-    function(action, object){
-      if (object.subtrahend)
-        action('subtrahend', object, object.subtrahend);
-    }
-  );
+  SUBSCRIPTION.addProperty('minuend');
+  SUBSCRIPTION.addProperty('subtrahend');
 
   
  /**
@@ -536,17 +501,23 @@
     minuend: null,
 
    /**
+    * Fires when minuend changed.
+    * @param {basis.data.AbstractDataset} oldMinuend Value of {basis.data.dataset.Subtract#minuend} before changes.
+    * @event
+    */
+    event_minuendChanged: createEvent('minuendChanged', 'oldMinuend'),
+
+   /**
     * @type {basis.data.AbstractDataset}
     */
     subtrahend: null,
 
    /**
-    * Fires when minuend or substrahend changed.
-    * @param {basis.data.DataObject} object Object which state was changed.
-    * @param {object} oldState Object state before changes.
+    * Fires when subtrahend changed.
+    * @param {basis.data.AbstractDataset} oldSubtrahend Value of {basis.data.dataset.Subtract#subtrahend} before changes.
     * @event
     */
-    event_operandsChanged: createEvent('operandsChanged', 'oldMinuend', 'oldSubtrahend'),
+    event_subtrahendChanged: createEvent('subtrahendChanged', 'oldSubtrahend'),
 
    /**
     * @inheritDoc
@@ -608,6 +579,8 @@
           if (minuend)
             minuend.addHandler(listenHandler, this);
         }
+
+        this.event_minuendChanged(oldMinuend);
       }
 
       // set new subtrahend if changed
@@ -625,13 +598,12 @@
           if (subtrahend)
             subtrahend.addHandler(listenHandler, this);
         }
+
+        this.event_subtrahendChanged(oldSubtrahend);
       }
 
       if (!operandsChanged)
         return false;
-
-      // emit event
-      this.event_operandsChanged(oldMinuend, oldSubtrahend);
 
       // apply changes
       if (!minuend || !subtrahend)
