@@ -94,7 +94,7 @@
   // Subscription schema
   //
 
-  var subscriptionHandlers = {};
+  var subscriptionConfig = {};
   var subscriptionSeed = 1;
 
 
@@ -114,8 +114,8 @@
 
       if (!subscribers[subscriberId])
       {
-        var count = to.subscriberCount += 1;
         subscribers[subscriberId] = from;
+        var count = to.subscriberCount += 1;
         if (count == 1)
           to.event_subscribersChanged(+1);
       }
@@ -130,12 +130,12 @@
 
       if (subscribers && subscribers[subscriberId])
       {
-        var count = to.subscriberCount -= 1;
         delete subscribers[subscriberId];
+        var count = to.subscriberCount -= 1;
         if (count == 0)
         {
           to.event_subscribersChanged(-1);
-          delete to.subscribers_;
+          to.subscribers_ = null;
         }
       }
       else
@@ -151,7 +151,7 @@
     * @param {function()} action
     */
     add: function(name, handler, action){
-      subscriptionHandlers[subscriptionSeed] = {
+      subscriptionConfig[subscriptionSeed] = {
         handler: handler,
         action: action
       };
@@ -205,7 +205,7 @@
       {
         if (mask & 1)
         {
-          var cfg = subscriptionHandlers[idx];
+          var cfg = subscriptionConfig[idx];
           for (var key in cfg.handler)
           {
             actions.push(cfg.action);
@@ -418,11 +418,11 @@
           {
             if (delta & 1)
             {
-              var cfg = subscriptionHandlers[idx];
+              var cfg = subscriptionConfig[idx];
               if (curSubscriptionType & idx)
-                cfg.action(rem, this);
+                cfg.action(SUBSCRIPTION.unlink, this);
               else
-                cfg.action(add, this);
+                cfg.action(SUBSCRIPTION.link, this);
             }
             idx <<= 1;
             delta >>= 1;
