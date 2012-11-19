@@ -97,12 +97,52 @@
   var subscriptionHandlers = {};
   var subscriptionSeed = 1;
 
+
  /**
   * @enum {number}
   */
   var SUBSCRIPTION = {
     NONE: 0,
     ALL: 0,
+
+    link: function(type, from, to){
+      var subscriberId = type + from.basisObjectId;
+      var subscribers = to.subscribers_;
+
+      if (!subscribers)
+        subscribers = to.subscribers_ = {};
+
+      if (!subscribers[subscriberId])
+      {
+        var count = to.subscriberCount += 1;
+        subscribers[subscriberId] = from;
+        if (count == 1)
+          to.event_subscribersChanged(+1);
+      }
+      else
+      {
+        ;;;basis.dev.warn('Attempt to add duplicate subscription');
+      }
+    },
+    unlink: function(type, from, to){
+      var subscriberId = type + from.basisObjectId;
+      var subscribers = to.subscribers_;
+
+      if (subscribers && subscribers[subscriberId])
+      {
+        var count = to.subscriberCount -= 1;
+        delete subscribers[subscriberId];
+        if (count == 0)
+        {
+          to.event_subscribersChanged(-1);
+          delete to.subscribers_;
+        }
+      }
+      else
+      {
+        ;;;basis.dev.warn('Trying remove non-exists subscription');
+      }
+    },
 
    /**
     * Register new type of subscription
@@ -113,119 +153,113 @@
     add: function(name, handler, action){
       subscriptionHandlers[subscriptionSeed] = {
         handler: handler,
-        action: action,
-        context: {
-          add: function(thisObject, object){
-            if (object)
-            {
-              var subscriberId = SUBSCRIPTION[name] + '_' + thisObject.basisObjectId;
-
-              if (!object.subscribers_)
-                object.subscribers_ = {};
-
-              if (!object.subscribers_[subscriberId])
-              {
-                var oldSubscriberCount = object.subscriberCount;
-                object.subscribers_[subscriberId] = thisObject;
-                object.subscriberCount += 1;
-                object.event_subscribersChanged(oldSubscriberCount);
-              }
-              else
-              {
-                ;;;basis.dev.warn('Attempt to add duplicate subscription');
-              }
-            }
-          },
-          remove: function(thisObject, object){
-            if (object)
-            {
-              var subscriberId = SUBSCRIPTION[name] + '_' + thisObject.basisObjectId;
-              if (object.subscribers_[subscriberId])
-              {
-                var oldSubscriberCount = object.subscriberCount;
-                delete object.subscribers_[subscriberId];
-                object.subscriberCount -= 1;
-                object.event_subscribersChanged(oldSubscriberCount);
-              }
-              else
-              {
-                ;;;basis.dev.warn('Trying remove non-exists subscription');
-              }
-            }
-          }
-        }
+        action: action
       };
 
       SUBSCRIPTION[name] = subscriptionSeed;
       SUBSCRIPTION.ALL |= subscriptionSeed;
 
       subscriptionSeed <<= 1;
+    },
+   /**
+    * @param {string} propertyName Name of property for subscription. Property must must be instance of {basis.data.AbstractData} class.
+    * @param {string=} eventName Name of event which fire when property changed. If omitted it will be equal to property name with 'Changed' suffix.
+    */
+    addProperty: function(propertyName, eventName){
+      var handler = {};
+      handler[eventName || propertyName + 'Changed'] = function(object, oldValue){
+        if (oldValue)
+          SUBSCRIPTION.unlink(propertyName, object, oldValue);
+
+        if (object[propertyName])
+          SUBSCRIPTION.link(propertyName, object, object[propertyName]);
+      };
+
+      this.add(propertyName.toUpperCase(), handler, function(fn, object){
+        if (object[propertyName])
+          fn(propertyName, object, object[propertyName]);
+      });
     }
   };
 
- /**
-  * Apply subscription according with current state.
-  * For internal purposes only.
-  */
-  function applySubscription(object, mask, state){
-    var idx = 1;
-    var config;
 
-    while (mask)
-    {
-      if (mask & 1)
-      {
-        config = subscriptionHandlers[idx];
-        if (state & idx)
-        {
-          object.addHandler(config.handler, config.context);
-          config.action(config.context.add, object);
-        }
-        else
-        {
-          object.removeHandler(config.handler, config.context);
-          config.action(config.context.remove, object);
-        }
-      }
-        
-      mask >>= 1;
-      idx <<= 1;
+  var maskConfig = {};
+
+  function mixFunctions(fnA, fnB){
+    return function(){
+      fnA.apply(this, arguments);
+      fnB.apply(this, arguments);
     }
   }
 
+  function getMaskConfig(mask){
+    var config = maskConfig[mask];
+
+    if (!config)
+    {
+      var actions = [];
+      var handler = {};
+      var idx = 1;
+
+      while (mask)
+      {
+        if (mask & 1)
+        {
+          var cfg = subscriptionHandlers[idx];
+          for (var key in cfg.handler)
+          {
+            actions.push(cfg.action);
+            handler[key] = handler[key]
+              ? mixFunctions(handler[key], cfg.handler[key])  // suppose it never be used, but do it for double sure
+              : cfg.handler[key];
+          }
+        }
+        idx <<= 1;
+        mask >>= 1;
+      }
+
+      config = maskConfig[mask] = {
+        actions: actions,
+        handler: handler
+      };
+    }
+
+    return config;
+  }
+
+  function addSub(object, mask){
+    var config = getMaskConfig(mask);    
+
+    for (var i = 0, action; action = config.actions[i]; i++)
+      action(SUBSCRIPTION.link, object);
+
+    object.addHandler(config.handler);
+  }
+
+  function remSub(object, mask){
+    var config = getMaskConfig(mask);    
+
+    for (var i = 0, action; action = config.actions[i++];)
+      action(SUBSCRIPTION.unlink, object);
+
+    object.removeHandler(config.handler);
+  }
+
+
   // Register base subscription types
 
-  SUBSCRIPTION.add(
-    'DELEGATE',
-    {
-      delegateChanged: function(object, oldDelegate){
-        this.remove(object, oldDelegate);
-        this.add(object, object.delegate);
-      }
-    },
-    function(action, object){
-      action(object, object.delegate);
-    }
-  );
-
-  SUBSCRIPTION.add(
-    'TARGET',
-    {
-      targetChanged: function(object, oldTarget){
-        this.remove(object, oldTarget);
-        this.add(object, object.target);
-      }
-    },
-    function(action, object){
-      action(object, object.target);
-    }
-  );
+  SUBSCRIPTION.addProperty('delegate', 'delegateChanged');
+  SUBSCRIPTION.addProperty('target', 'targetChanged');
 
 
   //
   // Abstract data
   //
 
+ /**
+  * Base class for any data type class.
+  * @class
+  */
   var AbstractData = Class(EventObject, {
     className: namespace + '.AbstractData',
 
@@ -294,8 +328,8 @@
       EventObject.prototype.init.call(this);
 
       // activate subscription if active
-      //if (this.active)
-      //  applySubscription(this, this.subscribeTo, SUBSCRIPTION.ALL);
+      if (this.active)
+        this.addHandler(getMaskConfig(this.subscribeTo).handler);
     },
 
    /**
@@ -348,7 +382,10 @@
         this.active = isActive;
         this.event_activeChanged();
 
-        applySubscription(this, this.subscribeTo, isActive ? SUBSCRIPTION.ALL : SUBSCRIPTION.NONE);
+        if (isActive)
+          addSub(this, this.subscribeTo);
+        else
+          remSub(this, this.subscribeTo);
 
         return true;
       }
@@ -371,7 +408,26 @@
         this.subscribeTo = newSubscriptionType;
 
         if (this.active)
-          applySubscription(this, delta, newSubscriptionType);
+        {
+          var curConfig = getMaskConfig(curSubscriptionType);
+          var newConfig = getMaskConfig(newSubscriptionType);
+          this.removeHandler(curConfig.handler);
+          this.addHandler(newConfig.handler);
+
+          while (delta)
+          {
+            if (delta & 1)
+            {
+              var cfg = subscriptionHandlers[idx];
+              if (curSubscriptionType & idx)
+                cfg.action(rem, this);
+              else
+                cfg.action(add, this);
+            }
+            idx <<= 1;
+            delta >>= 1;
+          }
+        }
 
         return true;
       }
@@ -385,7 +441,11 @@
     destroy: function(){
       // remove subscriptions if necessary
       if (this.active)
-        applySubscription(this, this.subscribeTo, 0);
+      {
+        var config = getMaskConfig(this.subscribeTo);
+        for (var i = 0, action; action = config.actions[i]; i++)
+          action(SUBSCRIPTION.unlink, this);
+      }
 
       // inherit
       EventObject.prototype.destroy.call(this);
@@ -567,10 +627,6 @@
         if (this.isTarget)
           this.target = this;
       }
-
-      // activate subscription if active
-      if (this.active)
-        applySubscription(this, this.subscribeTo, SUBSCRIPTION.ALL);
     },
 
    /**

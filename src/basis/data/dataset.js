@@ -49,26 +49,28 @@
     'SOURCE',
     {
       sourceChanged: function(object, oldSource){
-        this.remove(object, oldSource);
-        this.add(object, object.source);
+        if (oldSource)
+          SUBSCRIPTION.unlink('source', object, oldSource);
+        if (object.source)
+          SUBSCRIPTION.link('source', object, object.source);
       },
       sourcesChanged: function(object, delta){
         var array;
 
         if (array = delta.inserted)
           for (var i = array.length; i-- > 0;)
-            this.add(object, array[i]);
+            SUBSCRIPTION.link('source', object, array[i]);
 
         if (array = delta.deleted)
           for (var i = array.length; i-- > 0;)
-            this.remove(object, array[i]);
+            SUBSCRIPTION.unlink('source', object, array[i]);
       }
     },
     function(action, object){
-      var sources = object.sources || [object.source];
+      var sources = object.sources || (object.source ? [object.source] : []);
 
       for (var i = 0, source; source = sources[i++];)
-        action(object, source);
+        action('source', object, source);
     }
   );
 
@@ -78,13 +80,16 @@
       operandsChanged: function(object, oldMinuend){
         if (this.minuend !== oldMinuend)
         {
-          this.remove(object, oldMinuend);
-          this.add(object, object.minuend);
+          if (oldMinuend)
+            SUBSCRIPTION.unlink('minuend', object, oldMinuend);
+          if (object.minuend)
+            SUBSCRIPTION.link('minuend', object, object.minuend);
         }
       }
     },
     function(action, object){
-      action(object, object.minuend);
+      if (object.minuend)
+        action('minuend', object, object.minuend);
     }
   );
 
@@ -94,13 +99,16 @@
       operandsChanged: function(object, oldMinuend, oldSubtrahend){
         if (this.subtrahend !== oldSubtrahend)
         {
-          this.remove(object, oldSubtrahend);
-          this.add(object, object.subtrahend);
+          if (oldSubtrahend)
+            SUBSCRIPTION.unlink('subtrahend', object, oldSubtrahend);
+          if (object.subtrahend)
+            SUBSCRIPTION.link('subtrahend', object, object.subtrahend);
         }
       }
     },
     function(action, object){
-      action(object, object.subtrahend);
+      if (object.subtrahend)
+        action('subtrahend', object, object.subtrahend);
     }
   );
 
