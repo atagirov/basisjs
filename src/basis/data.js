@@ -201,6 +201,11 @@
       var handler = {};
       var idx = 1;
 
+      config = maskConfig[mask] = {
+        actions: actions,
+        handler: handler
+      };
+
       while (mask)
       {
         if (mask & 1)
@@ -217,11 +222,6 @@
         idx <<= 1;
         mask >>= 1;
       }
-
-      config = maskConfig[mask] = {
-        actions: actions,
-        handler: handler
-      };
     }
 
     return config;
@@ -411,9 +411,11 @@
         {
           var curConfig = getMaskConfig(curSubscriptionType);
           var newConfig = getMaskConfig(newSubscriptionType);
+
           this.removeHandler(curConfig.handler);
           this.addHandler(newConfig.handler);
 
+          var idx = 1;
           while (delta)
           {
             if (delta & 1)
