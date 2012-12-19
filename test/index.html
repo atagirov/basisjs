@@ -3,7 +3,7 @@
 <html>
 
 <head>
-  <meta http-equiv="Content-type" content="text/html; charset=windows-1251" />
+  <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
   <title>Basis Test Suite</title>
 
   <style type="text/css">
@@ -29,7 +29,8 @@
     {
       height: 100%;
       float: left;
-      width: 380px;
+      width: 50%;
+      max-width: 500px;
       border-right: 1px solid #888;
       overflow: auto;
       overflow-x: auto;
@@ -83,7 +84,7 @@
     {
       position: relative;
       float: right;
-      width: 15.5ex;
+      width: 30%;
       padding: .2em 4px 0 1px;
       height: 1.49em;
       _height: 1.65em;
@@ -160,6 +161,17 @@
       color: red;
     }
 
+    .show_test
+    {
+      float: right;
+      height: 1.25em;
+      padding: 3px;
+      border-left: 1px solid #D0D0D0;
+      cursor: pointer;
+      text-decoration: none;
+      color: black;
+    }
+
     .progressBar
     {
       border: 1px solid #888;
@@ -199,51 +211,55 @@
 
       var testCases = [
         { 
-          filename: 'basis-buildin_ext_and_fix.html',
+          url: 'specs/core/ext_and_fix.html',
           name: 'Buildin Classes/Objects extensions & fix'
         }, 
         { 
-          filename: 'basis-getter.html',
+          url: 'specs/core/getter.html',
           name: 'basis.getter'
         }, 
         { 
-          filename: 'basis-date.html',
+          url: 'specs/date.html',
           name: 'basis.date'
         }, 
         { 
-          filename: 'basis-dom.html',
+          url: 'specs/dom.html',
           name: 'basis.dom'
         },
         { 
-          filename: 'basis-stylesheet.html',
+          url: 'specs/stylesheet.html',
           name: 'basis.cssom.stylesheet'
         },
         { 
-          filename: 'basis-dom_wrapper.html',
+          url: 'specs/dom_wrapper.html',
           name: 'basis.dom.wrapper'
         }, 
         { 
-          filename: 'basis-crypt.html',
+          url: 'specs/crypt.html',
           name: 'basis.crypt'
         }, 
         { 
-          filename: 'basis-browser.html',
+          url: 'specs/browser.html',
           name: 'basis.ua'
         }, 
         { 
-          filename: 'basis-data-DataObject.html',
+          url: 'specs/l10n.html',
+          name: 'basis.l10n'
+        },
+        { 
+          url: 'specs/data/DataObject.html',
           name: 'basis.data.DataObject'
         }, 
         { 
-          filename: 'basis-property.html',
+          url: 'specs/data.property/property.html',
           name: 'basis.data.property'
         }, 
         { 
-          filename: 'basis-entity.html',
+          url: 'specs/entity/entity.html',
           name: 'basis.entity'
         }, 
         { 
-          filename: 'basis-template.html',
+          url: 'specs/template.html',
           name: 'basis.template'
         }
       ].map(function(data){
@@ -326,6 +342,7 @@
         childClass: {
           template:
             '<li class="testCase testCase-{state}">' +
+              '<a class="show_test" href="{url}#autorun" target="_blank">show</a>' +
               '<div class="indicator">' +
                 '<!--{progressBar}-->' +
                 '{error}' +
@@ -340,8 +357,14 @@
                 '</div>' +
               '</label>' +
             '</li>',
+          action: {
+            show: function(){
+              
+            }
+          },
           binding: {
             name: 'data:',
+            url: 'data:',
             testFrame: 'satellite:',
             progressBar: 'satellite:',
             error: {
@@ -390,7 +413,7 @@
                 },
                 binding: {
                   src: function(node){
-                    return node.data.filename + '?' + Math.random();
+                    return node.data.url + '?' + Math.random();
                   }
                 }
               })

@@ -644,11 +644,13 @@
         {
           var satellite = this.satellite[key];
 
-          satellite.setOwner(this);
-          this.event_satelliteChanged(key, null);
+          if (satellite instanceof AbstractNode)
+            satellite.setOwner(this);
 
           if (satelliteListen)
             satellite.addHandler(satelliteListen, this);
+
+          this.event_satelliteChanged(key, null);
         }  
       }
 
@@ -697,7 +699,8 @@
 
         if (oldSatellite)
         {
-          oldSatellite.setOwner(null);
+          if (oldSatellite instanceof AbstractNode)
+            oldSatellite.setOwner(null);
           if (satelliteListen)
             oldSatellite.removeHandler(satelliteListen, this);
         }
@@ -709,7 +712,8 @@
 
         if (satellite)
         {
-          satellite.setOwner(this);
+          if (satellite instanceof AbstractNode)
+            satellite.setOwner(this);
           if (satelliteListen)
             satellite.addHandler(satelliteListen, this);
         }

@@ -144,7 +144,7 @@
       '}'
     )(func);
     result.args = args;
-    result.isCalcField = true;
+    result.calc = result;
     return result;
   }
 
@@ -633,7 +633,7 @@
 
       this.aliases[key] = key;
 
-      if (typeof config == 'function')
+      if (typeof config == 'function' && config.calc !== config)
       {
         config = {
           type: config
@@ -715,9 +715,10 @@
       var before = this.calcs.length;
       var after = 0;
 
-      for (var i = 0; i < this.calcs.length; i++)
-        if (wrapper.args.has(this.calcs[i].key))
-          after = i + 1;
+      if (wrapper.args)
+        for (var i = 0; i < this.calcs.length; i++)
+          if (wrapper.args.has(this.calcs[i].key))
+            after = i + 1;
 
       if (key)
       {

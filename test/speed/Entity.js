@@ -6,6 +6,7 @@
     
     var MAX_COUNT = 3000;
     var MAX_COUNT_QUATER = MAX_COUNT >> 2;
+    var PROFILE = false;
     
     var DOM = basis.dom;
     var Data = basis.data;
@@ -318,6 +319,7 @@
     window.c2count = 0;
 
     function run_test(){
+      if (PROFILE) console.profile();
       run1(function(){
         run1(function(){
           var c1 = Transfer.createCollection('col1', getter('getId()%2'), Transfer.all);
@@ -330,6 +332,7 @@
           ]);
           run2(function(){
             run2(function(){
+              if (PROFILE) console.profileEnd();
               total();
             });
           });

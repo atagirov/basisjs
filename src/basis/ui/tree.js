@@ -1,7 +1,6 @@
 
   basis.require('basis.event');
   basis.require('basis.dom');
-  basis.require('basis.dom.event');
   basis.require('basis.ui');
   basis.require('basis.template');
 
@@ -23,7 +22,7 @@
   * Most part of component logic implemented in {basis.dom.wrapper} namespace,
   * and this one just contains templates and collapse/expand implementation.
   *
-  * @see ./test/speed-tree.html
+  * @see ./test/speed/tree.html
   * @see ./demo/data/entity.html
   *
   * @namespace basis.ui.tree
@@ -38,9 +37,7 @@
 
   var Class = basis.Class;
   var DOM = basis.dom;
-  var Event = basis.dom.event;
 
-  var getter = Function.getter;
   var createEvent = basis.event.create;
 
   var UINode = basis.ui.Node;
@@ -165,7 +162,7 @@
     action: {
       select: function(event){
         if (!this.isDisabled())
-          this.select(Event(event).ctrlKey);
+          this.select(event.ctrlKey);
       },
       toggle: function(){
         this.toggle();
