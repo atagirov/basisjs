@@ -282,7 +282,7 @@
     * subscription on).
     * @type {boolean}
     */
-    canSetDelegate: true,
+    active: true,
 
    /**
     * Fires when state of subscription was changed.
@@ -493,7 +493,7 @@
    /**
     * @type {boolean}
     */
-    canHaveDelegate: true,
+    canSetDelegate: true,
 
    /**
     * Object that manage data updates if assigned.
