@@ -147,7 +147,12 @@
     template: templates.Node,
 
     binding: {
-      title: 'data:title || "[no title]"',
+      title: {
+        events: 'update',
+        getter: function(node){
+          return node.data.title || '[no title]'
+        }
+      },
       collapsed: {
         events: 'expand collapse',
         getter: function(node){
@@ -162,7 +167,7 @@
     action: {
       select: function(event){
         if (!this.isDisabled())
-          this.select(event.ctrlKey);
+          this.select(event.ctrlKey || event.metaKey);
       },
       toggle: function(){
         this.toggle();
@@ -209,8 +214,6 @@
     init: function(){
       // inherit
       Node.prototype.init.call(this);
-
-      ;;;if ('collapsable' in this && typeof console != 'undefined') console.warn('WARN: collapsable property is not supported, use collapsible');
 
       if (this.collapsed && this.collapsible)
         this.event_collapse();

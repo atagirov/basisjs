@@ -25,6 +25,8 @@
  * - resouces
  * - basis.Class namespace (provides inheritance)
  * - cleaner
+ * - Token
+ * - basis.ready (on load handler)
  */
 
 // Define global scope: `window` in browser, or `global` on node.js
@@ -278,10 +280,49 @@
   */
   var getter = (function(){
     var modificatorSeed = 1;
+    var simplePath = /^[a-z$_][a-z$_0-9]*(\.[a-z$_][a-z$_0-9]*)*$/i;
 
     var getterMap = [];
     var pathCache = {};
     var modCache = {};
+
+    function buildFunction(path){
+      if (simplePath.test(path))
+      {
+        var parts = path.split('.');
+        var foo = parts[0];
+        var bar = parts[1];
+        var baz = parts[2];
+        switch (parts.length)
+        {
+          case 1:
+            return function(object){
+              return object != null ? object[foo] : object;
+            };
+          case 2:
+            return function(object){
+              return object != null ? object[foo][bar] : object;
+            };
+          case 3:
+            return function(object){
+              return object != null ? object[foo][bar][baz] : object;
+            };
+          default:
+            return function(object){
+              if (object != null)
+              {
+                object = object[foo][bar][baz];
+                for (var i = 3, key; key = parts[i]; i++)
+                  object = object[key];
+              }
+
+              return object;
+            }
+        }
+      }
+
+      return new Function('object', 'return object != null ? object.' + path + ' : object');
+    }
 
     return function(path, modificator){
       var func;
@@ -331,7 +372,7 @@
         else
         {
           // create getter function
-          func = new Function('object', 'return object != null ? object.' + path + ' : object');
+          func = buildFunction(path);
           func.base = path;
           func.__extend__ = getter;
 
@@ -427,8 +468,9 @@
 
   })();
 
-  var nullGetter = function(){};
-  nullGetter.__extend__ = getter;
+  var nullGetter = extend(function(){}, {
+    __extend__: getter
+  });
 
  /**
   * @param {function(object)|string|object} getter
@@ -559,7 +601,13 @@
 
     if (typeof console != 'undefined')
       iterate(methods, function(methodName){
-        methods[methodName] = Function.prototype.bind.call(console[methodName], console);
+        methods[methodName] = typeof console[methodName] == 'function'
+          ? Function.prototype.bind.call(console[methodName], console)
+            // ie8 and lower, it's also more safe when Function.prototype.bind defined
+            // by other libraries (like es5-shim)
+          : function(){
+              Function.prototype.apply.call(console[methodName], console, arguments)
+            };
       });
 
     return methods;
@@ -783,18 +831,18 @@
     * When strong parameter equal false insert position returns.
     * Otherwise returns position of founded item, but -1 if nothing found.
     * @param {*} value Value search for
-    * @param {function(object)|string=} getter
+    * @param {function(object)|string=} getter_
     * @param {boolean=} desc Must be true for reverse sorted arrays.
     * @param {boolean=} strong If true - returns result only if value found.
     * @param {number=} left Min left index. If omit it equals to zero.
     * @param {number=} right Max right index. If omit it equals to array length.
     * @return {number}
     */
-    binarySearchPos: function(value, getter, desc, strong, left, right){
+    binarySearchPos: function(value, getter_, desc, strong, left, right){
       if (!this.length)  // empty array check
         return strong ? -1 : 0;
 
-      getter = basis.getter(getter || $self);
+      getter_ = getter(getter_ || $self);
       desc = !!desc;
 
       var pos, compareValue;
@@ -804,7 +852,7 @@
       do
       {
         pos = (l + r) >> 1;
-        compareValue = getter(this[pos]);
+        compareValue = getter_(this[pos]);
         if (desc ? value > compareValue : value < compareValue)
           r = pos - 1;
         else
@@ -839,15 +887,15 @@
     merge: function(object){
       return this.reduce(extend, object || {});
     },
-    sortAsObject: function(getter, comparator, desc){
-      getter = basis.getter(getter);
+    sortAsObject: function(getter_, comparator, desc){
+      getter_ = getter(getter_);
       desc = desc ? -1 : 1;
 
       return this
         .map(function(item, index){
                return {
                  i: index,       // index
-                 v: getter(item) // value
+                 v: getter_(item) // value
                };
              })                                                                           // stability sorting (neccessary only for browsers with no strong sorting, just for sure)
         .sort(comparator || function(a, b){ return desc * ((a.v > b.v) || -(a.v < b.v) || (a.i > b.i ? 1 : -1)); })
@@ -871,7 +919,7 @@
 
   // IE 5.5+ & Opera
   // when second argument is omited, method set this parameter equal zero (must be equal array length)
-  if (![1,2].splice(1).length)
+  if (![1, 2].splice(1).length)
   {
     var nativeArraySplice = Array.prototype.splice;
     Array.prototype.splice = function(){
@@ -1074,6 +1122,7 @@
     };
   }
 
+
  /**
   * Number extensions
   * @namespace Number.prototype
@@ -1127,6 +1176,7 @@
     }
   });
 
+
   // ============================================
   // Date (other extensions & fixes moved to date.js)
   //
@@ -1172,7 +1222,7 @@
   //
 
  /**
-  * Root namespace for Basis framework.
+  * Root namespace for basis.js framework.
   * @namespace basis
   */
 
@@ -1189,6 +1239,7 @@
     {
       var _node_path = require('path');
       var _node_fs = require('fs');
+
       utils = slice(_node_path, [
         'normalize',
         'dirname',
@@ -1197,6 +1248,7 @@
         'resolve',
         'relative'
       ]);
+
       utils.existsSync = _node_fs.existsSync || _node_path.existsSync;
     }
     else
@@ -1275,15 +1327,18 @@
           }
 
           var wrapFunction = typeof wrapFn == 'function' ? wrapFn : null;
+          var pathFn = function(name){
+            return path + (name ? '.' + name : '');
+          };
+          pathFn.toString = $const(path);
 
           return extend(namespace, {
-            path: path,
+            path: pathFn,
             exports: {},
-            toString: function(){ return '[basis.namespace ' + path + ']'; },
+            toString: $const('[basis.namespace ' + path + ']'),
             extend: function(names){
-              complete(this, names);
               extend(this.exports, names);
-              return this;
+              return complete(this, names);
             },
             setWrapper: function(wrapFn){
               if (typeof wrapFn == 'function')
@@ -1410,7 +1465,7 @@
 
           var requestUrl = requirePath + filename;
 
-          var ns = basis.namespace(namespace);
+          var ns = getNamespace(namespace);
           var scriptText = externalResource(requestUrl);
           runScriptInContext(ns, requestUrl, scriptText, '/** @namespace ' + namespace + ' */\n');
           complete(ns, ns.exports);
@@ -1437,6 +1492,9 @@
       {
         var req = new XMLHttpRequest();
         req.open('GET', url, false);
+        // set if-modified-since header since begining prevents cache using;
+        // otherwise browser could never ask server for new file content
+        // and use file content from cache
         req.setRequestHeader('If-Modified-Since', new Date(0).toGMTString());
         req.send('');
 
@@ -1482,7 +1540,6 @@
       }
 
       //consoleMethods.log('new resource resolver:' + resourceUrl);
-      var attaches = [];
       var resourceObject;
       var wrapped = false;
       var resource = extWrapper
@@ -1524,8 +1581,6 @@
             }
 
             this.apply();
-            //for (var i = 0, listener; listener = attaches[i]; i++)
-            //  listener.handler.call(listener.context, content);
           }
         },
         reload: function(){
@@ -1703,6 +1758,15 @@
       return cursor === superClass;
     }
 
+   /**
+    * @func
+    * dev mode only
+    */
+    function dev_verboseNameWrap(name, args, fn){
+      return new Function(keys(args), 'return {"' + name + '": ' + fn + '\n}["' + name + '"]').apply(null, values(args));
+    }
+
+
     // test is toString property enumerable
     var TOSTRING_BUG = (function(){
       for (var key in { toString: 1 })
@@ -1749,6 +1813,10 @@
 
         // temp class constructor with no init call
         var SuperClass_ = function(){};
+
+        // verbose name in dev
+        ;;;SuperClass_ = dev_verboseNameWrap(SuperClass.className, {}, SuperClass_);
+
         SuperClass_.prototype = SuperClass.prototype;
 
         var newProto = new SuperClass_;
@@ -1790,54 +1858,49 @@
 
 
         /** @cut */if (newProto.init != NULL_FUNCTION && !/^function[^(]*\(\)/.test(newProto.init) && newClassProps.extendConstructor_) consoleMethods.warn('probably wrong extendConstructor_ value for ' + newClassProps.className);
-        /** @cut *///if (genericClassName == newClassProps.className) { console.warn('Class has no className'); }
+        /** @cut *///if (genericClassName == newClassProps.className) { consoleMethods.warn('Class has no className'); }
 
         // new class constructor
         // NOTE: this code makes Chrome and Firefox show class name in console
         var className = newClassProps.className;
 
-        var newClass =
-            /** @cut for more verbose in dev */ new Function('seed', 'return {"' + className + '": ' + (
+        var newClass = newClassProps.extendConstructor_
+          // constructor with instance extension
+          ? function(extend){
+              // mark object
+              this.basisObjectId = seed.id++;
 
-              newClassProps.extendConstructor_
+              // extend and override instance properties
+              var prop;
+              for (var key in extend)
+              {
+                prop = this[key];
+                this[key] = prop && prop.__extend__
+                  ? prop.__extend__(extend[key])
+                  : extend[key];
+              }
 
-                // constructor with instance extension
-                ? function(extend, config){
-                    // mark object
-                    this.basisObjectId = seed.id++;
+              // call constructor
+              this.init();
 
-                    // extend and override instance properties
-                    var prop;
-                    for (var key in extend)
-                    {
-                      prop = this[key];
-                      this[key] = prop && prop.__extend__
-                        ? prop.__extend__(extend[key])
-                        : extend[key];
-                    }
+              // post init
+              this.postInit();
+            }
 
-                    ;;;if (config) consoleMethods.warn('config param is obsolete for extensible classes (ignored)');
+          // simple constructor
+          : function(){
+              // mark object
+              this.basisObjectId = seed.id++;
 
-                    // call constructor
-                    this.init();
+              // call constructor
+              this.init.apply(this, arguments);
 
-                    // post init
-                    this.postInit();
-                  }
+              // post init
+              this.postInit();
+            };
 
-                // simple constructor
-                : function(){
-                    // mark object
-                    this.basisObjectId = seed.id++;
-
-                    // call constructor
-                    this.init.apply(this, arguments);
-
-                    // post init
-                    this.postInit();
-                  }
-
-            /** @cut for more verbose in dev */ ) + '\n}["' + className + '"]')(seed);
+        // verbose name in dev
+        ;;;newClass = dev_verboseNameWrap(className, { seed: seed }, newClass);
 
         // add constructor property to prototype
         newProto.constructor = newClass;
@@ -1899,7 +1962,7 @@
    /**
     * @func
     */
-    var customExtendProperty = function(extension, func){
+    var customExtendProperty = function(extension, func, devName){
       return {
         __extend__: function(extension){
           if (!extension)
@@ -1909,6 +1972,7 @@
             return extension;
 
           var Base = function(){};
+          /** @cut verbose name in dev */Base = dev_verboseNameWrap(devName || 'customExtendProperty', {}, Base);
           Base.prototype = this;
           var result = new Base;
           func(result, extension);
@@ -1922,7 +1986,7 @@
     * @func
     */
     var extensibleProperty = function(extension){
-      return customExtendProperty(extension, extend);
+      return customExtendProperty(extension, extend, 'extensibleProperty');
     };
 
 
@@ -1938,7 +2002,7 @@
             ? value.__extend__(extension[key])
             : extensibleProperty(extension[key]);
         }
-      });
+      }, 'nestedExtendProperty');
     };
 
    /**
@@ -1956,6 +2020,9 @@
           result = {
             __extend__: create
           };
+
+          // verbose name in dev
+          ;;;var Cls = dev_verboseNameWrap('oneFunctionProperty', {}, function(){}); result = new Cls; result.__extend__ = create;
 
           for (var key in keys)
             if (keys[key])
@@ -1986,29 +2053,26 @@
   })();
 
 
-  //
-  // on document load event dispatcher
-  //
-
  /**
-  * Attach load handlers for page
+  * Attach document ready handlers
   * @function
-  * @param {function(event)} handler 
-  * @param {object=} thisObject Context for handler
+  * @param {function()} handler 
+  * @param {*} thisObject Context for handler
   */
-  var onLoad = (function(){
-    // Matthias Miller/Mark Wubben/Paul Sowden/Dean Edwards/John Resig and Me :)
+  var ready = (function(){
+    // Matthias Miller/Mark Wubben/Paul Sowden/Dean Edwards/John Resig/Roman Dvornov
 
-    var fired = false;
-    var loadHandler = [];
+    var fired = !document || document.readyState == 'complete';
+    var deferredHandler;
 
     function fireHandlers(){
-      if (typeof document != 'undefined' && document.readyState == 'complete')
-      {
+      if (document.readyState == 'complete')
         if (!fired++)
-          for (var i = 0; i < loadHandler.length; i++)
-            loadHandler[i].callback.call(loadHandler[i].thisObject);
-      }
+          while (deferredHandler)
+          {
+            deferredHandler.callback.call(deferredHandler.context);
+            deferredHandler = deferredHandler.next;
+          }
     }
 
     // The DOM ready check for Internet Explorer
@@ -2023,7 +2087,7 @@
       }
     }
 
-    if (typeof document != 'undefined' && document.readyState != 'complete')
+    if (!fired)
     {
       if (document.addEventListener)
       {
@@ -2031,38 +2095,39 @@
         document.addEventListener('DOMContentLoaded', fireHandlers, false);
 
         // A fallback to window.onload, that will always work
-        window.addEventListener('load', fireHandlers, false);
+        global.addEventListener('load', fireHandlers, false);
       }
       else
       {
         // ensure firing before onload,
-  			// maybe late but safe also for iframes
+        // maybe late but safe also for iframes
         document.attachEvent('onreadystatechange', fireHandlers);
 
         // A fallback to window.onload, that will always work
-        window.attachEvent('onload', fireHandlers);
+        global.attachEvent('onload', fireHandlers);
 
         // If IE and not a frame
-  			// continually check to see if the document is ready
-  			try {
-  				if (window.frameElement == null && document.documentElement.doScroll)
+        // continually check to see if the document is ready
+        try {
+          if (!global.frameElement && document.documentElement.doScroll)
             doScrollCheck();
-  			} catch(e) {
-  			}
+        } catch(e) {
+        }
       }
     }
 
     // return attach function
-    return function(callback, thisObject){
+    return function(callback, context){
       if (!fired)
       {
-        loadHandler.push({
+        deferredHandler = {
           callback: callback,
-          thisObject: thisObject
-        });
+          context: context,
+          next: deferredHandler
+        };
       }
       else
-        callback.call(thisObject);
+        callback.call(context);
     };
   })();
 
@@ -2078,7 +2143,7 @@
     var objects = [];
 
     function destroy(log){
-      ;;;var logDestroy = log && typeof log == 'boolean' && typeof console != 'undefined';
+      ;;;var logDestroy = log && typeof log == 'boolean';
       result.globalDestroy = true;
       result.add = $undef;
       result.remove = $undef;
@@ -2139,7 +2204,7 @@
   var Token = Class(null, {
     className: 'basis.Token',
 
-    attachList: null,
+    handlers: null,
 
     bindingBridge: {
       attach: function(host, fn, context){
@@ -2153,54 +2218,55 @@
       }
     },
 
-    // constructor
-    init: function(){
-      this.attachList = [];
-    },
-
     set: function(value){
     },
     get: function(){
     },
 
     attach: function(fn, context){
-      var attachList = this.attachList;
+      var cursor = this;
 
-      for (var i = attachList.length; i-- > 0;)
-        if (attachList[i].fn === fn && attachList[i].context === context)
+      while (cursor = cursor.handlers)
+        if (cursor.fn === fn && cursor.context === context)
           return false;
 
-      attachList.push({
+      this.handlers = {
         fn: fn,
-        context: context
-      });
+        context: context,
+        handlers: this.handlers
+      };
 
       return true;
     },
     detach: function(fn, context){
-      var attachList = this.attachList;
+      var cursor = this;
+      var prev = this;
 
-      for (var i = attachList.length; i-- > 0;)
-        if (attachList[i].fn === fn && attachList[i].context === context)
+      while (cursor = cursor.handlers)
+      {
+        if (cursor.fn === fn && cursor.context === context)
         {
-          attachList.splice(i, 1);
+          prev.handlers = cursor.handlers;
           return true;
         }
+
+        prev = cursor;
+      }
 
       return false;
     },
 
     apply: function(){
-      var attachList = this.attachList;
       var value = this.get();
+      var cursor = this;
 
-      for (var i = attachList.length; i-- > 0;)
-        attachList[i].fn.call(attachList[i].context, value);
+      while (cursor = cursor.handlers)
+        cursor.fn.call(cursor.context, value);
     },
 
     // destructor
     destroy: function(){
-      this.attachList = null;
+      this.handlers = null;
     }  
   });
 
@@ -2209,9 +2275,8 @@
   // export names
   //
 
-  // extend Basis
-  var basis = getNamespace('basis');
-  basis.extend({
+  // create and extend basis namespace
+  var basis = getNamespace('basis').extend({
     NODE_ENV: NODE_ENV,
     config: config,
     platformFeature: {},
@@ -2224,7 +2289,7 @@
     },
 
     getter: getter,
-    ready: onLoad,
+    ready: ready,
 
     Class: Class,
     Token: Token,
@@ -2245,31 +2310,31 @@
     fn: {
       // test functions
       $undefined: $undefined,
-      $defined:   $defined,
-      $isNull:    $isNull,
+      $defined: $defined,
+      $isNull: $isNull,
       $isNotNull: $isNotNull,
-      $isSame:    $isSame,
+      $isSame: $isSame,
       $isNotSame: $isNotSame,
 
       // gag functions
-      $self:      $self,
-      $const:     $const,
-      $false:     $false,
-      $true:      $true,
-      $null:      $null,
-      $undef:     $undef,
+      $self: $self,
+      $const: $const,
+      $false: $false,
+      $true: $true,
+      $null: $null,
+      $undef: $undef,
 
       // getters and modificators
-      getter:     getter,
+      getter: getter,
       nullGetter: nullGetter,
-      def:        def,
-      wrapper:    wrapper,
+      def: def,
+      wrapper: wrapper,
 
       // lazy
-      lazyInit:   lazyInit,
+      lazyInit: lazyInit,
       lazyInitAndRun: lazyInitAndRun,
-      runOnce:    runOnce,
-      body:       functionBody
+      runOnce: runOnce,
+      body: functionBody
     },
     array: extend(arrayFrom, {
       from: arrayFrom,
@@ -2288,6 +2353,7 @@
   // TODO: rename path->stmElse and add path to exports
   basis.path = pathUtils;
 
+
   //
   // basis extenstions
   //
@@ -2296,6 +2362,7 @@
   extend(Function, basis.fn);
   extend(Array, basis.array);
   extend(String, basis.string);
+
 
   //
   // auto load section

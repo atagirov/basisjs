@@ -25,14 +25,14 @@
 <body>
   <script type="text/javascript">
     basis.require('basis.format.highlight');
-    basis.require('basis.net.ajax');
+    basis.require('basis.net');
 
     var line = parseInt((location.hash || '').replace(/^#/, ''));
     var filename = ((location.search || '').match(/[\?\&]file=([^&]+)/) || [])[1];
     if (filename)
     {
-      var transport = new basis.net.ajax.Transport({
-        url: '../' + filename,
+      (new basis.net.Transport({
+        url: filename,
         handler: {
           complete: function(sender, req){
             //t = new Date;
@@ -60,8 +60,7 @@
             }
           }
         }
-      });
-      transport.get();
+      })).request();
     }
   </script>
 </body>

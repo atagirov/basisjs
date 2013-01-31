@@ -12,6 +12,8 @@
 
   var Class = basis.Class;
   var cleaner = basis.cleaner;
+  var path = basis.path;
+
 
   //
   // Main part
@@ -332,18 +334,13 @@
           value: source.substring(textStateEndPos, pos)
         });
 
-      //if (!result.length)   // there must be at least one token in result
-      //  result.push({ type: TYPE_TEXT, value: '' });
-
       if (tagStack.length > 1)
         throw 'No close tag for ' + tagStack.pop().name;
 
       result.templateTokens = true;
 
     } catch(e) {
-      /*
-      console.warn(e + ':\n' + source.substr(0, br) + '\n' + Array(i - offset + 1).join(' ') + '\u25b2-- problem here \n' + source.substr(br));
-      /*/;;;basis.dev.warn(e, source); /* */
+      ;;;basis.dev.warn(e, source);
     }
 
     return result;
@@ -657,7 +654,7 @@
                 case 'resource':
 
                   if (elAttrs.src)
-                    template.resources.push(basis.path.resolve(template.baseURI + elAttrs.src));
+                    template.resources.push(path.resolve(template.baseURI + elAttrs.src));
 
                 break;
 
@@ -716,19 +713,15 @@
                       }
                       else
                       {
+                        var resource;
+
                         if (/^[a-z0-9\.]+$/i.test(url) && !/\.tmpl$/.test(url))
-                        {
-                          var resource = getSourceByPath(url);
-                          template.deps.add(resource);
-                          decl = getDeclFromSource(resource.get(), resource.url ? basis.path.dirname(resource.url) + '/' : '', true);
-                        }
+                          resource = getSourceByPath(url);
                         else
-                        {
-                          url = basis.path.resolve(template.baseURI + url);
-                          var resource = basis.resource(url);
-                          template.deps.add(resource);
-                          decl = getDeclFromSource(resource(), resource.url ? basis.path.dirname(resource.url) + '/' : '', true);
-                        }
+                          resource = basis.resource(path.resolve(template.baseURI + url));
+
+                        template.deps.add(resource);
+                        decl = getDeclFromSource(resource.get(), resource.url ? path.dirname(resource.url) + '/' : '', true);
                       }
 
                       includeStack.pop();
@@ -738,8 +731,8 @@
                       if (decl.deps)
                         addUnique(template.deps, decl.deps);
 
-                      //console.log(elAttrs.src + ' -> ' + url);
-                      //console.log(decl);
+                      //basis.dev.log(elAttrs.src + ' -> ' + url);
+                      //basis.dev.log(decl);
 
                       var tokenRefMap = normalizeRefs(decl.tokens);
                       var instructions = (token.childs || []).slice();
@@ -999,9 +992,7 @@
 
     return function(source, baseURI, options){
       var debug = !!(options && options.debug);
-
-      if (!source.templateTokens)
-        source = tokenize('' + source);
+      ;;;var source_;
 
       // result object
       var result = {
@@ -1014,11 +1005,19 @@
         options: {}
       };
 
+      if (!source.templateTokens)
+      {
+        ;;;source_ = source;
+        source = tokenize('' + source);
+      }
+
       if (debug)
         result.warns = [];
 
       // main task
       result.tokens = process(source, result);
+
+      ;;;if (source_) result.tokens.source_ = source_;
 
       // there must be at least one token in result
       if (!result.tokens)
@@ -1058,19 +1057,14 @@
     '.css': true
   };
 
-  function isUsableResource(path){
-    var ext = path.match(/(\.[a-z0-9_\-]+)+$/);
-    return ext && usableResources[ext[0]];
+  function startUseResource(uri){
+    if (usableResources[path.extname(uri)])
+      basis.resource(uri)().startUse();
   }
 
-  function startUseResource(url){
-    if (isUsableResource(url))
-      basis.resource(url)().startUse();
-  }
-
-  function stopUseResource(url){
-    if (isUsableResource(url))
-      basis.resource(url)().stopUse();
+  function stopUseResource(uri){
+    if (usableResources[path.extname(uri)])
+      basis.resource(uri)().stopUse();
   }
 
 
@@ -1089,14 +1083,14 @@
   function cloneDecl(array){
     var result = [];
 
+    ;;;if (array.source_) result.source_ = array.source_;
+
     for (var i = 0; i < array.length; i++)
-    {
       result.push(
         Array.isArray(array[i])
           ? cloneDecl(array[i])
           : array[i]
       );
-    }
 
     return result;
   }
@@ -1138,6 +1132,82 @@
  /**
   * @func
   */
+  function createTemplateBindingUpdater(names, getters){
+    return function templateBindingUpdater(){
+      for (var i = 0, bindingName; bindingName = names[i]; i++)
+        this.tmpl.set(bindingName, getters[bindingName](this));
+    };
+  }
+
+ /**
+  * @func
+  */
+  function createBindingFunction(keys){
+    var bindingCache = {};
+    return function getBinding(bindings, testNode){
+      var cacheId = 'bindingId' in bindings
+        ? bindings.bindingId
+        : null;
+
+      ;;;if (!cacheId) basis.dev.warn('basis.template.Template.getBinding: bindings has no bindingId property, cache is not used');
+
+      var result = bindingCache[cacheId];
+
+      if (!result)
+      {
+        var names = [];
+        var getters = {};
+        var events = {};
+        var handler;
+        for (var i = 0, key; key = keys[i]; i++)
+        {
+          var binding = bindings[key];
+          var getter = binding && binding.getter;
+
+          if (getter)
+          {
+            getters[key] = getter;
+            names.push(key);
+
+            if (binding.events)
+            {
+              var eventList = String(binding.events).qw();
+              for (var j = 0, eventName; eventName = eventList[j]; j++)
+              {
+                ;;;if (testNode && ('event_' + eventName) in testNode == false) basis.dev.warn('basis.template.Template.getBinding: unknown event `' + eventName + '` for ' + (testNode.constructor && testNode.constructor.className));
+                if (events[eventName])
+                {
+                  events[eventName].push(key);
+                }
+                else
+                {
+                  handler = handler || {};
+                  events[eventName] = [key];
+                  handler[eventName] = createTemplateBindingUpdater(events[eventName], getters);
+                }
+              }
+            }
+          }
+        }
+
+        result = {
+          names: names,
+          events: events,
+          sync: createTemplateBindingUpdater(names, getters),
+          handler: handler
+        };
+
+        if (cacheId)
+          bindingCache[cacheId] = result;
+      }
+
+      return result;
+    };
+  }
+
+ /**
+  * @func
+  */
   function buildTemplate(){
     var decl = getDeclFromSource(this.source, this.baseURI);
     var instances = this.instances_;
@@ -1168,10 +1238,10 @@
     }
 
     this.createInstance = funcs.createInstance;
-    this.getBinding = funcs.getBinding;
+    this.getBinding = createBindingFunction(funcs.keys);
     this.instances_ = funcs.map;
 
-    var l10nProtoUpdate = funcs.l10nProtoUpdate;
+    var l10nProtoSync = funcs.l10nProtoSync;
     var hasResources = decl.resources && decl.resources.length > 0;
 
     if (hasResources)
@@ -1188,18 +1258,18 @@
       for (var id in instances)
         instances[id].rebuild();
 
-    if (funcs.l10n)
+    if (funcs.l10nKeys)
     {
       l10n = [];
       this.l10n_ = l10n;
       instances = funcs.map;
-      for (var key in funcs.l10n)
+      for (var i = 0, key; key = funcs.l10nKeys[i]; i++)
       {
         var link = {
           path: key,
           token: basis.l10n.getToken(key),
           handler: function(value){
-            l10nProtoUpdate(this.path, value);
+            l10nProtoSync(this.path, value);
             for (var id in instances)
               instances[id].set(this.path, value);
           }
@@ -1217,16 +1287,15 @@
 
   function sourceById(sourceId){
     var host = document.getElementById(sourceId);
+
     if (host && host.tagName == 'SCRIPT')
     {
-      var content = host.textContent || host.text;
+      if (host.type == 'text/basis-template')
+        content = host.textContent || host.text;
+      
+      ;;;basis.dev.warn('Template script element with wrong type', host.type);
 
-      switch (host.type)
-      {
-        case 'text/basis-template':
-        default:
-          return content;
-      }
+      return '';
     }
 
     ;;;basis.dev.warn('Template script element with id `' + sourceId + '` not found');
@@ -1249,23 +1318,27 @@
   * method.
   * @example
   *   // create a template
-  *   var template = new basis.template.Template(
-  *     '<li{element} class="listitem">' +
-  *       '<a href{hrefAttr}="#">{titleText}</a>' + 
-  *       '<span class="description">{descriptionText}</span>' +
+  *   var template = new basis.template.html.Template(
+  *     '<li class="listitem item-{num}" title="Item #{num}: {title}">' +
+  *       '<a href="{url}">{title}</a>' + 
+  *       '<span class="description">{description}</span>' +
   *     '</li>'
   *   );
-  *   
+  *
+  *   // create list container
+  *   var list = document.createElement('ul'); // or create using another template
+  *
   *   // create 10 DOM elements using template
   *   for (var i = 0; i < 10; i++)
   *   {
   *     var tmpl = template.createInstance();
-  *     basis.cssom.classList(tmpl.element).add('item' + i);
-  *     tmpl.hrefAttr.nodeValue = '/foo/bar.html';
-  *     tmpl.titleText.nodeValue = 'some title';
-  *     tmpl.descriptionText.nodeValue = 'description text';
+  *     tmpl.set('num', i);
+  *     tmpl.set('url', '/foo/bar.html');
+  *     tmpl.set('title, 'some title');
+  *     tmpl.set('description', 'description text');
+  *     list.appendChild(tmpl.element);
   *   }
-  *   
+  *
   * @class
   */
   var Template = Class(null, {
@@ -1447,8 +1520,9 @@
     className: namespace + '.SourceWrapper',
     content: null,
 
-    init: function(content){
+    init: function(content, path){
       basis.Token.prototype.init.call(this);
+      this.path = path;
       this.set(content);
     },
     set: function(content){
@@ -1485,7 +1559,7 @@
 
     if (!source)
     {
-      source = new SourceWrapper('');
+      source = new SourceWrapper('', path);
       sourceByPath[path] = source;
     }
 
@@ -1810,6 +1884,7 @@
 
     // for debug purposes
     tokenize: tokenize,
+    getDeclFromSource: getDeclFromSource,
     makeDeclaration: makeDeclaration,
 
     // theme

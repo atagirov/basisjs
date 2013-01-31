@@ -2,6 +2,7 @@
   basis.require('basis.data');
   basis.require('basis.dom');
   basis.require('basis.dom.wrapper');
+  basis.require('basis.l10n');
   basis.require('basis.ui');
 
 
@@ -24,20 +25,34 @@
 
   var Class = basis.Class;
   var DOM = basis.dom;
-  var cssom = basis.cssom;
-
-  var getter = Function.getter;
-  var nullGetter = Function.nullGetter;
-  var extend = basis.object.extend;
-
   var nsData = basis.data;
 
-  var nsWrapper = basis.dom.wrapper;
-  var GroupingNode = nsWrapper.GroupingNode;
-  var PartitionNode = nsWrapper.PartitionNode;
+  var getter = basis.getter;
+  var nullGetter = basis.fn.nullGetter;
+  var extend = basis.object.extend;
 
+  var GroupingNode = basis.dom.wrapper.GroupingNode;
+  var PartitionNode = basis.dom.wrapper.PartitionNode;
   var UINode = basis.ui.Node;
   var UIPartitionNode = basis.ui.PartitionNode;
+
+
+  //
+  // definitions
+  //
+
+  var templates = basis.template.define(namespace, {
+    Table: resource('templates/table/Table.tmpl'),
+    Body: resource('templates/table/Body.tmpl'),
+    Row: resource('templates/table/Row.tmpl'),
+
+    Header: resource('templates/table/Header.tmpl'),
+    HeaderPartitionNode: resource('templates/table/HeaderPartitionNode.tmpl'),
+    HeaderCell: resource('templates/table/HeaderCell.tmpl'),
+    
+    FooterCell: resource('templates/table/FooterCell.tmpl'),
+    Footer: resource('templates/table/Footer.tmpl'),
+  });
 
 
   //
@@ -50,8 +65,7 @@
   var HeaderPartitionNode = Class(UINode, {
     className: namespace + '.HeaderPartitionNode',
 
-    template: resource('templates/table/HeaderPartitionNode.tmpl'),
-
+    template: templates.HeaderPartitionNode,
     binding: {
       title: 'data:'
     }
@@ -86,6 +100,7 @@
       className: namespace + '.HeaderPartitionNode',
       init: function(){
         PartitionNode.prototype.init.call(this);
+
         this.cell = new HeaderPartitionNode({
           delegate: this,
           binding: this.binding || {}
@@ -166,7 +181,7 @@
     colSorting: null,
     defaultOrder: false,
 
-    template: resource('templates/table/HeaderCell.tmpl'),
+    template: templates.HeaderCell,
 
     binding: {
       sortable: function(node){
@@ -224,7 +239,7 @@
 
     groupingClass: HeaderGroupingNode,
 
-    template: resource('templates/table/Header.tmpl'),
+    template: templates.Header,
 
     binding: {
       order: function(node){
@@ -328,14 +343,17 @@
   var FooterCell = Class(UINode, {
     className: namespace + '.FooterCell',
 
-    colSpan: 1,
+    value: '',
 
-    template: resource('templates/table/FooterCell.tmpl'),
-
+    template: templates.FooterCell,
     binding: {
-      colSpan: 'colSpan'
+      colSpan: 'colSpan',
+      value: function(node){
+        return node.value || String(node.value) || '\xA0';
+      }
     },
 
+    colSpan: 1,
     setColSpan: function(colSpan){
       this.colSpan = colSpan || 1;
       this.updateBind('colSpan');
@@ -348,16 +366,14 @@
   var Footer = Class(UINode, {
     className: namespace + '.Footer',
 
-    childClass: FooterCell,
+    template: templates.Footer,
 
-    template: resource('templates/table/Footer.tmpl'),
+    childClass: FooterCell,
 
     init: function(){
       UINode.prototype.init.call(this);
 
       this.applyConfig_(this.structure);
-
-      cssom.display(this.element, this.useFooter);
     },
 
     applyConfig_: function(structure){
@@ -386,13 +402,24 @@
               content = content.call(this);
               
             this.useFooter = true;
-            
-            cell = this.appendChild({
-              //colSpan: footerConfig.colSpan || 1,
+
+            // fill config
+
+            var config = {
               cssClassName: (colConfig.cssClassName || '') + ' ' + (footerConfig.cssClassName || ''),
-              content: content,
-              template: footerConfig.template || FooterCell.prototype.template
-            });
+              content: content
+            };
+
+            if (footerConfig.template)
+              config.template = footerConfig.template;
+            if (footerConfig.binding)
+              config.binding = footerConfig.binding;
+            if ('value' in footerConfig)
+              config.value = footerConfig.value;
+
+            // create instace of cell
+           
+            cell = this.appendChild(config);
           }
           else
           {
@@ -424,12 +451,12 @@
     childClass: null,
     repaintCount: 0,
 
-    template: resource('templates/table/Row.tmpl'),
+    template: templates.Row,
 
     action: { 
       select: function(event){
         if (!this.isDisabled())
-          this.select(event.ctrlKey);
+          this.select(event.ctrlKey || event.metaKey);
       }
     }
   });
@@ -442,7 +469,7 @@
 
     collapsed: false,
 
-    template: resource('templates/table/Body.tmpl'),
+    template: templates.Body,
 
     binding: {
       collapsed: function(node){
@@ -464,6 +491,13 @@
   var Table = Class(UINode, {
     className: namespace + '.Table',
 
+    template: templates.Table,
+
+    headerClass: Header,
+    footerClass: Footer,
+
+    columnCount: 0,
+
     selection: true, 
     childClass: Row,
 
@@ -472,30 +506,21 @@
       childClass: Body
     },
 
-    template: resource('templates/table/Table.tmpl'),
-
-    headerClass: Header,
-    footerClass: Footer,
-
-    columnCount: 0,
-
     init: function(){
-
-      ;;;if ('rowSatellite' in this && typeof console != 'undefined') console.warn('rowSatellite is deprecated. Move all extensions into childClass');
-      ;;;if ('rowBehaviour' in this && typeof console != 'undefined') console.warn('rowBehaviour is deprecated. Move all extensions into childClass');
-
       this.applyConfig_(this.structure);
 
       UINode.prototype.init.call(this);
 
-      //this.headerConfig = this.header;
-      //this.footerConfig = this.footer;
-
       this.header = new this.headerClass(extend({ owner: this, structure: this.structure }, this.header));
       this.footer = new this.footerClass(extend({ owner: this, structure: this.structure }, this.footer));
+    },
+
+    templateSync: function(noRecreate){
+      UINode.prototype.templateSync.call(this, noRecreate);
 
       DOM.replace(this.tmpl.header, this.header.element);
-      DOM.replace(this.tmpl.footer, this.footer.element);
+      if (this.footer.useFooter)
+        DOM.replace(this.tmpl.footer, this.footer.element);      
     },
 
     applyConfig_: function(structure){

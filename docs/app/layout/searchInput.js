@@ -4,14 +4,13 @@
 
   var SearchMatchInput = basis.ui.field.MatchInput.subclass({
     matchFilterClass: basis.ui.field.MatchFilter.subclass({
-      textNodeGetter: Function.getter('tmpl.title'),
+      textNodeGetter: basis.getter('tmpl.title'),
       event_change: function(value, oldValue){
         basis.ui.field.MatchProperty.prototype.event_change.call(this, value, oldValue);
 
         var fc = value.charAt(0);
         var v = value.substr(1).replace(/./g, function(m){ return '[' + m.toUpperCase() + m.toLowerCase() + ']'; });
         var rx = new RegExp('(^|[^a-zA-Z])([' + fc.toLowerCase() + fc.toUpperCase() +']' + v + ')|([a-z])(' + fc.toUpperCase() + v + ')');
-        //console.log(rx.source);
         var textNodeGetter = this.textNodeGetter;
         var wrapMap = this.map;
 

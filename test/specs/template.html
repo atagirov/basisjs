@@ -38,6 +38,10 @@
           template = createTemplate(template);
 
         var tmpl = template.createInstance();
+        if (binding)
+          for (var key in binding)
+            tmpl.set(key, binding[key]);
+
         var fragment = tmpl.element.parentNode;
         var cursor = fragment.firstChild;
         var res = '';
@@ -83,6 +87,15 @@
                         var b = createTemplate('<b:include src="#' + a.templateId + '" class="b"></b:include>');
 
                         this.is(text('<span class="a b"/>'), text(b))
+                      }
+                    },
+                    {
+                      name: 'class binding for class addiction',
+                      test: function(){
+                        var a = createTemplate('<span class="a"/>');
+                        var b = createTemplate('<b:include src="#' + a.templateId + '" class="{b}"></b:include>');
+
+                        this.is(text('<span class="a b"/>'), text(b, { b: 'b' }));
                       }
                     },
                     {

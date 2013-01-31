@@ -15,11 +15,6 @@
       font-family: Tahoma, Verdana, Arial, sans-serif;
     }
 
-    #demo-container
-    {
-      font-family: Consolas;
-    }
-
     .barWrapper
     {
       position: relative;
@@ -47,10 +42,19 @@
       margin-right: 2ex;
       float: left;
     }
+    .Basis-Table .right
+    {
+      text-align: right;
+    }
     #RecordPanel
     {
       width: 250px;
       float: left;
+      display: none;
+    }
+    #RecordPanel.hasDelegate
+    {
+      display: block;
     }
     .Basis-ButtonPanel
     {
@@ -92,7 +96,7 @@
     var nsDataIndex = basis.data.index;
     var cssom = basis.cssom;
 
-    var getter = Function.getter;
+    var getter = basis.getter;
     var ButtonPanel = basis.ui.button.ButtonPanel;
     var Table = basis.ui.table.Table;
     var Slider = basis.ui.slider.Slider;
@@ -104,40 +108,27 @@
       var seed = 0;
 
       return function(){
-        seed++;
         return new basis.data.Object({
           data: {
-            id: seed,
+            id: ++seed,
             title: 'item' + seed,
-            value: parseInt(50 * Math.random()),
-            total: parseInt(150 * Math.random())
+            value: parseInt(50 * Math.random(), 10),
+            total: parseInt(150 * Math.random(), 10)
           }
         });
       };
     })();
 
     var dataset = new basis.data.Dataset({
-      items: Array.create(15, createDataItem)
+      items: basis.array.create(15, createDataItem)
     });
 
     var indexMap = new nsDataIndex.IndexMap({
       source: dataset,
-      indexes: {
-        valueMax: nsDataIndex.max('data.value'),
-        totalMax: nsDataIndex.max('data.total'),
-        totalMin: nsDataIndex.min('data.total'),
-        totalSum: nsDataIndex.sum('data.total')
-      },
       calcs: {
-        percentOfValueMax: function(data, indexes){
-          return data.value / indexes.valueMax;
-        },
-        percentOfTotalMax: function(data, indexes){
-          return (data.total - indexes.totalMin) / (indexes.totalMax - indexes.totalMin);
-        },
-        percentOfTotalSum: function(data, indexes){
-          return data.total / indexes.totalSum;
-        }
+        percentOfValueMax: nsDataIndex.percentOfMax('data.value'),
+        percentOfTotalRange: nsDataIndex.percentOfRange('data.total'),
+        percentOfTotalSum: nsDataIndex.percentOfSum('data.total')
       }
     });
 
@@ -153,14 +144,14 @@
         {
           caption: 'add 5',
           click: function(){
-            dataset.add(Array.create(5, createDataItem));
+            dataset.add(basis.array.create(5, createDataItem));
           }
         },
         {
           caption: 'remove',
           click: function(){
             if (table.firstChild)
-              dataset.remove([table.firstChild.root]);
+              dataset.remove(table.firstChild.root);
           }
         },
         {
@@ -181,7 +172,7 @@
             }
             indexMap.unlock();
 
-            console.log('stress test time', new Date - t);
+            basis.dev.log('stress test time', new Date - t);
           }
         }
       ]
@@ -190,7 +181,7 @@
     var count = 0;
     var table = new Table({
       container: DOM.get('demo-container'),
-      dataSource: dataset, //new basis.data.dataset.Subset({ source: dataset, rule: function(d){ return d.data.id < 50 } }),
+      dataSource: dataset,
       structure: [
         {
           header: '#',
@@ -198,9 +189,9 @@
           footer: function(){
             return [
               'min/max: ',
-              dataset.getIndex(basis.data.index.min('data.value')).addLink(basis.dom.createText()),
+              basis.data.index.min(dataset, 'data.value').addLink(basis.dom.createText()),
               '/',
-              dataset.getIndex(basis.data.index.max('data.value')).addLink(basis.dom.createText())
+              basis.data.index.max(dataset, 'data.value').addLink(basis.dom.createText())
             ];
           }
         },
@@ -210,21 +201,21 @@
           body: '{title}'
         },
         {
-          sorting: Function.getter('data.value', Number),
+          sorting: basis.getter('data.value', Number),
           cssClassName: 'right',
           header: 'Value',
-          body: '<div class="barWrapper"><div{percentOfValueMax} class="bar"/><span class="label">{value}</span></div>',
-          footer: function(){
-            return dataset.getIndex(basis.data.index.count(Function.$true)).addLink(basis.dom.createText());
+          body: '<div class="barWrapper"><div class="bar" style="width: {percentOfValueMax}%"/><span class="label">{value}</span></div>',
+          footer: {
+            value: basis.data.index.count(dataset)
           }
         },
         {
-          sorting: Function.getter('data.total', Number),
+          sorting: basis.getter('data.total', Number),
           cssClassName: 'right',
           header: 'Total',
-          body: '<div class="barWrapper"><div{percentOfTotalMax} class="bar"/><span class="label">{total}</span></div>',
-          footer: function(){
-            return dataset.getIndex(basis.data.index.sum('data.total')).addLink(basis.dom.createText());
+          body: '<div class="barWrapper"><div class="bar" style="width: {percentOfTotalRange}%"/><span class="label">{total}</span></div>',
+          footer: {
+            value: basis.data.index.sum(dataset, 'data.total')
           }
         },
         {
@@ -232,20 +223,17 @@
           cssClassName: 'right',
           body: '{percentOfTotalSum}',
           footer: function(){
-            return indexMap.getIndex(basis.data.index.avg('data.percentOfTotalMax * 100')).addLink(basis.dom.createText(), null, '{0:.2}%');
+            return basis.data.index.avg(indexMap, 'data.percentOfTotalRange * 100').addLink(basis.dom.createText(), null, '{0:.2}%');
           }
         }
       ],
 
       childClass: {
-        templateUpdate: function(tmpl, eventName, delta){
-          if (delta)
-            for (var key in delta)
-              tmpl[key].nodeValue = this.data[key];
-          else
-            for (var key in this.data)
-              if (key in tmpl)
-                tmpl[key].nodeValue = this.data[key];
+        binding: {
+          id: 'data:',
+          title: 'data:',
+          value: 'data:',
+          total: 'data:'
         },
         satelliteConfig: {
           indexes: {
@@ -256,13 +244,12 @@
             instanceOf: nsData.Object.subclass({
               active: true,
               event_update: function(delta){
-                //console.log(count++, delta);
                 nsData.Object.prototype.event_update.call(this, delta);
 
                 var tmpl = this.owner.tmpl;
-                tmpl.percentOfTotalSum.nodeValue = '{0:.2}%'.format(100 * this.data.percentOfTotalSum);
-                tmpl.percentOfTotalMax.style.width = '{0:.2}%'.format(100 * this.data.percentOfTotalMax);
-                tmpl.percentOfValueMax.style.width = '{0:.2}%'.format(100 * this.data.percentOfValueMax);
+                tmpl.set('percentOfTotalSum', '{0:.2}%'.format(100 * this.data.percentOfTotalSum));
+                tmpl.set('percentOfTotalRange', '{0:.2}%'.format(100 * this.data.percentOfTotalRange));
+                tmpl.set('percentOfValueMax', '{0:.2}%'.format(100 * this.data.percentOfValueMax));
               }
             })
           }
@@ -279,48 +266,39 @@
 
     var recordPanel = new UINode({
       container: DOM.get('demo-container'),
-      id: 'RecordPanel',
-      handler: {
-        delegateChanged: function(){
-          cssom.display(this.element, !!this.delegate);
+      template: '<div id="RecordPanel" class="{hasDelegate}"/>',
+      binding: {
+        hasDelegate: {
+          events: 'delegateChanged',
+          getter: 'delegate'
         }
       },
+      childClass: Slider.subclass({
+        autoDelegate: true,
+        marks: 10,
+        handler: {
+          update: function(){
+            if (this.propName in this.data)
+              this.setValue(this.data[this.propName]);
+          },
+          change: function(){
+            var data = {};
+            data[this.propName] = this.value;
+            this.update(data);
+          }
+        }        
+      }),
       childNodes: [
-        new Slider({
-          autoDelegate: basis.dom.wrapper.DELEGATE.PARENT,
-          min: 0,
-          max: 50,
-          marks: 10,
-          handler: {
-            update: function(){
-              if ('value' in this.data)
-                this.setValue(this.data.value);
-            },
-            change: function(){
-              this.update({ value: this.value });
-            }
-          }
-        }),
-        new Slider({
-          autoDelegate: basis.dom.wrapper.DELEGATE.PARENT,
-          min: 0,
-          max: 150,
-          marks: 10,
-          handler: {
-            update: function(){
-              if ('total' in this.data)
-                this.setValue(this.data.total);
-            },
-            change: function(){
-              this.update({
-                total: this.value
-              });
-            }
-          }
-        })
+        {
+          propName: 'value',
+          max: 50
+        },
+        {
+          propName: 'total',
+          max: 150
+        }
       ]
     });
-    cssom.hide(recordPanel.element);
 
 
     

@@ -7,13 +7,6 @@
 
 
   //
-  // import names
-  //
-
-  var getter = Function.getter;
-
-
-  //
   // main part
   //
 
@@ -35,7 +28,7 @@
   var GETTER = {};
   var SETTER = {};
 
-  Object.iterate({
+  basis.object.iterate({
     year: 'FullYear',
     month: 'Month',
     day: 'Date',
@@ -43,33 +36,27 @@
     minute: 'Minutes',
     second: 'Seconds',
     millisecond: 'Milliseconds'
-  }, function(key, value){
-    GETTER[key] = getter('get' + value + '()');
-    SETTER[key] = new Function('d,v', 'd.set' + value + '(v)');
+  }, function(key, name){
+    GETTER[key] = function(date){
+      return date['get' + name]()
+    };
+    SETTER[key] = function(date, value){
+      return date['set' + name](value);
+    };
   });
 
-  var FORMAT = {
-    y: getter('getFullYear().toString().substr(2)'),               // %y - year in YY
-    Y: getter('getFullYear()'),                                    // %Y - year in YYYY
-    d: getter('getDate()'),                                        // %d - day (1..31)
-    D: getter('getDate()', '{0:02}'),                              // %D - day (01..31)
-    m: getter('getMonth() + 1'),                                   // %m - month (1..12)
-    M: getter('getMonth() + 1', '{0:02}'),                         // %M - month (01..12)
-    h: getter('getHours()'),                                       // %h - hours (0..23)
-    H: getter('getHours()', '{0:02}'),                             // %H - hours (00..23)
-    i: getter('getHours() % 12 || 12', '{0:02}'),                  // %i - hours (01..12)
-    p: getter('getHours() > 12', { 'true': 'pm', 'false': 'am' }), // %p - am or pm
-    P: getter('getHours() > 12', { 'true': 'PM', 'false': 'AM' }), // %p - AM or PM
-    I: getter('getMinutes()', '{0:02}'),                           // %I - minutes (00..59)
-    s: getter('getSeconds()'),                                     // %s - seconds (0..59)
-    S: getter('getSeconds()', '{0:02}'),                           // %S - seconds (00..59)
-    z: getter('getMilliseconds()'),                                // %z - milliseconds (0..999)
-    Z: getter('getMilliseconds()', '{0:03}')                       // %Z - milliseconds (000..999)
-  };
+  function lead2(num){
+    return num < 10 ? '0' + num : num;
+  }
 
-  var reISOFormat = /^(\d{1,4})-(\d\d?)-(\d\d?)(?:[T ](\d\d?):(\d\d?):(\d\d?)(?:\.(\d{1,3}))?)?$/;
-  var reFormat = /%([ymdhiszp])/ig;
+  function lead3(num){
+    return num < 100 ? '0' + lead2(num) : num;
+  }  
+
+  var reISOFormat = /^(\d{1,4})-(\d\d?)-(\d\d?)(?:[T ](\d\d?):(\d\d?):(\d\d?)(?:\.(\d+))?)?$/;
+  var reFormat = /%([yYdDmMhHipPIsSzZ])/g;
   var reIsoStringSplit = /\D/;
+  var reIsoTimezoneDesignator = /(.{10,})([\-\+]\d{1,2}):?(\d{1,2})?$/;
 
   // functions
 
@@ -81,15 +68,56 @@
     return month == 1 ? 28 + isLeapYear(year) : MONTH_DAY_COUNT[month];
   }
 
-  function dateFormat(date, format){
-    return format.replace(reFormat, function(m, part){
-      return FORMAT[part](date);
-    });
+  function dateFormat(date, format, useUTC){
+    var local = function(m, part){
+      switch (part)
+      {
+        case 'y': return String(date.getFullYear()).substr(2);      // %y - year in YY
+        case 'Y': return date.getFullYear();                        // %Y - year in YYYY
+        case 'd': return date.getDate();                            // %d - day (1..31)
+        case 'D': return lead2(date.getDate());                     // %D - day (01..31)
+        case 'm': return date.getMonth() + 1;                       // %m - month (1..12)
+        case 'M': return lead2(date.getMonth() + 1);                // %M - month (01..12)
+        case 'h': return date.getHours();                           // %h - hours (0..23)
+        case 'H': return lead2(date.getHours());                    // %H - hours (00..23)
+        case 'i': return lead2(date.getHours() % 12 || 12);         // %i - hours (01..12)
+        case 'p': return date.getHours() > 12 ? 'pm' : 'am';        // %p - am or pm
+        case 'P': return date.getHours() > 12 ? 'PM' : 'AM';        // %p - AM or PM
+        case 'I': return lead2(date.getMinutes());                  // %I - minutes (00..59)
+        case 's': return date.getSeconds();                         // %s - seconds (0..59)
+        case 'S': return lead2(date.getSeconds());                  // %S - seconds (00..59)
+        case 'z': return date.getMilliseconds();                    // %z - milliseconds (0..999)
+        case 'Z': return lead3(date.getMilliseconds());             // %Z - milliseconds (000..999)
+      }
+    };
+    var utc = function(m, part){
+      switch (part)
+      {
+        case 'y': return String(date.getUTCFullYear()).substr(2);      // %y - year in YY
+        case 'Y': return date.getUTCFullYear();                        // %Y - year in YYYY
+        case 'd': return date.getUTCDate();                            // %d - day (1..31)
+        case 'D': return lead2(date.getUTCDate());                     // %D - day (01..31)
+        case 'm': return date.getUTCMonth() + 1;                       // %m - month (1..12)
+        case 'M': return lead2(date.getUTCMonth() + 1);                // %M - month (01..12)
+        case 'h': return date.getUTCHours();                           // %h - hours (0..23)
+        case 'H': return lead2(date.getUTCHours());                    // %H - hours (00..23)
+        case 'i': return lead2(date.getUTCHours() % 12 || 12);         // %i - hours (01..12)
+        case 'p': return date.getUTCHours() > 12 ? 'pm' : 'am';        // %p - am or pm
+        case 'P': return date.getUTCHours() > 12 ? 'PM' : 'AM';        // %p - AM or PM
+        case 'I': return lead2(date.getUTCMinutes());                  // %I - minutes (00..59)
+        case 's': return date.getUTCSeconds();                         // %s - seconds (0..59)
+        case 'S': return lead2(date.getUTCSeconds());                  // %S - seconds (00..59)
+        case 'z': return date.getUTCMilliseconds();                    // %z - milliseconds (0..999)
+        case 'Z': return lead3(date.getUTCMilliseconds());             // %Z - milliseconds (000..999)
+      }
+    }
+
+    return format.replace(reFormat, useUTC ? utc : local);
   }
 
   // Date prototype extension
 
-  Object.extend(Date.prototype, {
+  basis.object.extend(Date.prototype, {
     isLeapYear: function(){
       return isLeapYear(this.getFullYear());
     },
@@ -180,10 +208,10 @@
       throw new Error(PART_ERROR + part);
     },
     toISODateString: function(){
-      return dateFormat(this, '%Y-%M-%D');
+      return dateFormat(this, '%Y-%M-%D', true);
     },
     toISOTimeString: function(){
-      return dateFormat(this, '%H:%I:%S.%Z');
+      return dateFormat(this, '%H:%I:%S.%Z', true);
     },
     fromDate: function(date){
       if (date instanceof Date)
@@ -199,46 +227,38 @@
     }
   });
 
-  var _native_toISOString = Date.prototype.toISOString;
-  if (_native_toISOString && (new Date).toISOString().match(/Z/i))
-  {
-    Date.prototype.toISOString = function(){
-      return _native_toISOString.call(this).replace(/Z/i, '');
-    };
-  }
-
-  Object.complete(Date.prototype, {
+  basis.object.complete(Date.prototype, {
     // implemented in ECMAScript5
     // TODO: check for time zone
     toISOString: function(){
-      return this.toISODateString() + 'T' + this.toISOTimeString();
+      return this.toISODateString() + 'T' + this.toISOTimeString() + 'Z';
     },
-    fromISOString: function(datetime){
-      var m = String(datetime).match(reISOFormat);
-      if (!m)
-        throw new Error('Value of date isn\'t in ISO format: ' + datetime);
-
-      m[2] -= 1; // substract 1 for monthes
-      for (var i = 0, part; part = DATE_PART[i]; i++)
-        this.set(part, m[i + 1] || 0);
-
-      return this;
+    fromISOString: function(isoDateString){
+      return this.fromDate(fromISOString(isoDateString));
     }
   });
 
   // extend Date
+  var fromISOString = (function(){
+    function fastDateParse(y, m, d, h, i, s, ms){
+      return new Date(y, m - 1, d, h || 0, (i || 0) - tz, s || 0, ms ? ms.substr(0, 3) : 0);
+    }
 
-  function fastDateParse(y, m, d, h, i, s, ms){
-    return new Date(y, m - 1, d, h || 0, i || 0, s || 0, ms || 0);
-  }
-  function fromISOString(isoString){
-    return isoString ? fastDateParse.apply(null, String(isoString).split(reIsoStringSplit)) : null;
-  }
+    var tzoffset = (new Date).getTimezoneOffset();
+    var tz;
 
-  Date.fromISOString = function(){
-    ;;; if (typeof console != 'undefined') console.warn('Date.fromISOString is deprecated, use basis.date.fromISOString instead');
-    return (Date.fromISOString = fromISOString).apply(this, arguments);
-  };
+    return function(isoDateString){
+      return fastDateParse.apply(
+        tz = tzoffset,
+        String(isoDateString || '')
+          .replace(reIsoTimezoneDesignator, function(m, pre, h, i){
+            tz += i ? h * 60 + i * 1 : h * 1;
+            return pre;
+          })
+          .split(reIsoStringSplit)
+      );
+    }
+  })();
 
 
   //

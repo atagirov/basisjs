@@ -105,7 +105,7 @@
       satelliteConfig: {
         source: {
           hook: { toggle: true },
-          existsIf: Function.getter('expanded'),
+          existsIf: basis.getter('expanded'),
           instanceOf: basis.format.highlight.SourceCodeNode.subclass({
             autoDelegate: basis.dom.wrapper.DELEGATE.OWNER,
             lang: 'js',
@@ -184,7 +184,7 @@
       satelliteConfig: {
         source: {
           hook: { toggle: true },
-          existsIf: Function.getter('expanded'),
+          existsIf: basis.getter('expanded'),
           instanceOf: basis.format.highlight.SourceCodeNode.subclass({
             autoDelegate: basis.dom.wrapper.DELEGATE.OWNER,
             lang: 'js',
@@ -221,7 +221,9 @@
       },
       externalFileUrl: function(node){
         var template = node.data.obj && node.data.obj.prototype.template;
-        return ((template && template.source && template.source.url) || '').replace(/^(.*)(src\/basis\/)/i, '$2');
+        var url = (template && template.source && template.source.url) || '';
+        
+        return url && basis.path.relative(url);
       }
     },
 
@@ -243,8 +245,7 @@
         {
           rootCfg.childNodes = [];
 
-          var source = String(typeof template.source == 'function' ? template.source() : template.source);
-          var decl = basis.template.makeDeclaration(source, template.baseURI);
+          var decl = basis.template.getDeclFromSource(template.source, template.baseURI);
 
           rootCfg.childNodes = buildTemplateTree(decl.tokens);
         }
@@ -266,14 +267,14 @@
     satelliteConfig: {
       bindings: {
         hook: { templateViewChanged: true },
-        existsIf: Function.getter('templateView'),
-        delegate: Function.$self,
+        existsIf: basis.getter('templateView'),
+        delegate: basis.fn.$self,
         instanceOf: BindingsPanel
       },
       actions: {
         hook: { templateViewChanged: true },
-        existsIf: Function.getter('templateView'),
-        delegate: Function.$self,
+        existsIf: basis.getter('templateView'),
+        delegate: basis.fn.$self,
         instanceOf: ActionsPanel
       }
     }

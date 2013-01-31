@@ -4,6 +4,7 @@
   basis.require('basis.dom.event');
   basis.require('basis.cssom');
   basis.require('basis.layout');
+  basis.require('basis.l10n');
   basis.require('basis.ui');
 
 
@@ -23,14 +24,28 @@
   var DOM = basis.dom;
   var Event = basis.dom.event;
   var cssom = basis.cssom;
+  var layout = basis.layout;
 
-  var getter = Function.getter;
+  var getter = basis.getter;
   var arrayFrom = basis.array.from;
   var createEvent = basis.event.create;
 
-  var nsLayout = basis.layout;
-
   var UINode = basis.ui.Node;
+
+
+  //
+  // definitions
+  //
+
+  var templates = basis.template.define(namespace, {
+    Popup: resource('templates/popup/Popup.tmpl'),
+    Balloon: resource('templates/popup/Balloon.tmpl'),
+    popupManager: resource('templates/popup/popupManager.tmpl')
+  });
+
+  basis.l10n.createDictionary(namespace, __dirname + 'l10n/popup', {
+    "close": "Close"
+  });
 
 
   //
@@ -66,15 +81,6 @@
     CENTER: CENTER
   };
 
-  var THREAD_HANDLER = {
-    finish: function(){
-      if (!this.visible)
-      {
-        DOM.remove(this.element);
-        this.event_cleanup();
-      }
-    }
-  };
 
  /**
   * @class
@@ -82,9 +88,9 @@
   var Popup = Class(UINode, {
     className: namespace + '.Popup',
 
-    closeText: 'Close',
+    closeText: basis.l10n.getToken(namespace, 'close'),
 
-    template: resource('templates/popup/Popup.tmpl'),
+    template: templates.Popup,
 
     binding: {
       visible: {
@@ -114,7 +120,6 @@
     event_show: createEvent('show'),
     event_hide: createEvent('hide'),
     event_realign: createEvent('realign'),
-    event_cleanup: createEvent('cleanup'),
     event_layoutChanged: createEvent('layoutChanged', 'oldOrientation', 'oldDir'),
 
     visible: false,
@@ -134,19 +139,16 @@
       // add generic rule
       this.cssRule = cssom.uniqueRule(this.element);
 
-      // 
       this.ignoreClickFor = arrayFrom(this.ignoreClickFor);
 
       if (this.dir)
         this.defaultDir = this.dir.toUpperCase();
 
       this.setLayout(this.defaultDir, this.orientation);
-        
-      if (this.thread)
-        this.thread.addHandler(THREAD_HANDLER, this);
     },
     templateSync: function(noRecreate){
       UINode.prototype.templateSync.call(this, noRecreate);
+
       if (this.element)
       {
         cssom.classList(this.element).add(this.cssRule.token);
@@ -218,8 +220,8 @@
     isFitToViewport: function(dir){
       if (this.visible && this.relElement)
       {
-        var box = new nsLayout.Box(this.relElement, false, this.element.offsetParent);
-        var viewport = new nsLayout.Viewport(this.element.offsetParent);
+        var box = new layout.Box(this.relElement, false, this.element.offsetParent);
+        var viewport = new layout.Viewport(this.element.offsetParent);
         var width  = this.element.offsetWidth;
         var height = this.element.offsetHeight;
 
@@ -250,23 +252,23 @@
     },
     setZIndex: function(zIndex){
       this.zIndex = isNaN(zIndex) ? 'auto' : zIndex;
-      //this.element.style.zIndex = zIndex;
       cssom.setStyle(this.element, {
         'z-index': zIndex
       });
     },
     realign: function(){
       this.setZIndex(this.zIndex);
+
       if (this.visible && this.relElement)
       {
         var dir = this.dir.qw();
-
         var point;
         var rotateOffset = 0;
         var curDir = dir;
         var dirH = dir[2];
         var dirV = dir[3];
         var maxRotate = typeof this.autorotate == 'number' || !this.autorotate.length ? 3 : this.autorotate.length;
+
         while (this.autorotate && rotateOffset <= maxRotate)
         {
           if (point = this.isFitToViewport(curDir.join(' ')))
@@ -295,15 +297,15 @@
 
         if (!point)
         {
-          var box = new nsLayout.Box(this.relElement, false, this.element.offsetParent);
+          var box = new layout.Box(this.relElement, false, this.element.offsetParent);
+
           point = {
             x: dir[0] == CENTER ? box.left + (box.width >> 1) : box[dir[0].toLowerCase()],
             y: dir[1] == CENTER ? box.top + (box.height >> 1) : box[dir[1].toLowerCase()]
           };
         }
 
-        var offsetParentBox = new nsLayout.Box(this.element.offsetParent);
-
+        var offsetParentBox = new layout.Box(this.element.offsetParent);
         var style = {
           left: 'auto',
           right: 'auto',
@@ -311,7 +313,8 @@
           bottom: 'auto'
         };
 
-        switch (dirH){
+        switch (dirH)
+        {
           case LEFT:
             style.left = point.x + 'px';
             break;
@@ -323,7 +326,8 @@
             break;
         }
 
-        switch (dirV){
+        switch (dirV)
+        {
           case TOP:
             style.top = point.y + 'px';
             break;
@@ -353,7 +357,7 @@
         // error on relElement no assigned
         if (!this.relElement)
         {
-          ;;;if (typeof console != 'undefined') console.warn('Popup.show(): relElement missed');
+          ;;;basis.dev.warn('Popup#show(): relElement missed');
           return;
         }
 
@@ -365,12 +369,12 @@
         // dispatch `beforeShow` event, there we can fill popup with content
         this.event_beforeShow();
 
-        // set visible flag to TRUE
+        // set visible flag
         this.visible = true;
 
         // realign position and make it visible
         this.realign();
-        if (this.thread) this.thread.start(1);
+
         cssom.visibility(this.element, true);
 
         // dispatch `show` event, there we can set focus for elements etc.
@@ -381,21 +385,10 @@
     },
     hide: function(){
       if (this.visible)
-      {
-        // remove from DOM
-        if (DOM.parentOf(document.body, this.element))
-        {
-          if (this.thread)
-            this.thread.start(1);
-          else
-          {
-            DOM.remove(this.element);
-            this.event_cleanup();
-          }
-        }
-
-        // set visible flag to FALSE
+      { 
+        // set visible flag
         this.visible = false;
+
         if (this.parentNode)
           popupManager.removeChild(this);
 
@@ -407,12 +400,6 @@
       popupManager.clear();
     },
     destroy: function(){
-      if (this.thread)
-      {
-        this.thread.removeHandler(THREAD_HANDLER, this);
-        this.thread = null;
-      }
-
       this.hide();
 
       UINode.prototype.destroy.call(this);
@@ -428,7 +415,7 @@
   var Balloon = Class(Popup, {
     className: namespace + '.Balloon',
 
-    template: resource('templates/popup/Balloon.tmpl')
+    template: templates.Balloon
   });
 
 
@@ -440,12 +427,11 @@
   // which makes popup visible can also hide it (as click outside of popup).
 
   var popupManager = new UINode({
-    template: resource('templates/popup/popupManager.tmpl'),
+    template: templates.popupManager,
 
     handheldMode: false,
-
     selection: true,
-    childClass: Popup,
+
     event_childNodesModified: function(delta){
       if (delta.deleted)
         for (var i = delta.deleted.length - 1, item; item = delta.deleted[i]; i--)

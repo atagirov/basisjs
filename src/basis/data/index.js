@@ -82,7 +82,7 @@
    /**
     * @type {function(object)}
     */
-    valueGetter: Function.$null,
+    valueGetter: basis.fn.$null,
 
    /**
     * Event names map when index must check for updates.
@@ -163,7 +163,7 @@
    /**
     * @inheritDoc
     */
-    valueGetter: Function.$true,
+    valueGetter: basis.fn.$true,
 
    /**
     * @inheritDoc
@@ -234,7 +234,7 @@
     * function to fetch item from vector
     * @type {function(object)}
     */
-    itemGetter: Function.$null,
+    itemGetter: basis.fn.$null,
 
    /**
     * Values vector
@@ -320,13 +320,19 @@
   };
 
  /**
-  * @constructor
+  * @class
   */
-  function IndexConstructor(BaseClass, getter, events){
+  function IndexConstructor(){
+  }
+
+ /**
+  * @function
+  */
+  function getIndexConstructor(BaseClass, getter, events){
     if (!Class.isClass(BaseClass) || !BaseClass.isSubclassOf(Index))
       throw 'Wrong class for index constructor';
 
-    getter = Function.getter(getter);
+    getter = basis.getter(getter);
     events = events || 'update';
 
     if (typeof events != 'string')
@@ -339,7 +345,7 @@
 
     if (indexConstructor)
       return indexConstructor.owner;
-
+    
     //
     // Create new constructor
     //
@@ -348,8 +354,9 @@
     for (var i = 0; i < events.length; i++)
       events_[events[i]] = true;
 
+    indexConstructor = new IndexConstructor();
     indexConstructors_[indexId] = {
-      owner: this,
+      owner: indexConstructor,
       indexClass: BaseClass.subclass({
         indexId: indexId,
         updateEvents: events_,
@@ -357,12 +364,27 @@
       })
     };
 
-    this.indexId = indexId;
+    indexConstructor.indexId = indexId;
+    return indexConstructor;
   }
 
-  var createIndexConstructor = function(IndexClass){
+  var createIndexConstructor = function(IndexClass, defGetter){
     return function(getter, events){
-      return new IndexConstructor(IndexClass, getter, events);
+      var dataset;
+
+      if (getter instanceof AbstractDataset)
+      {
+        dataset = getter;
+        getter = events;
+        events = arguments[2];
+      }
+
+      var indexConstructor = getIndexConstructor(IndexClass, getter || defGetter, events);
+
+      if (dataset)
+        return dataset.getIndex(indexConstructor);
+      else
+        return indexConstructor;
     };
   };
 
@@ -370,7 +392,7 @@
   // Build basic index constructors
   //
 
-  var count = createIndexConstructor(Count);
+  var count = createIndexConstructor(Count, basis.fn.$true);
   var sum = createIndexConstructor(Sum);
   var avg = createIndexConstructor(Avg);
   var min = createIndexConstructor(Min);
@@ -535,6 +557,71 @@
   });
 
 
+  var CalcIndexPreset = Class(null, {
+    extendConstructor_: true,
+    indexes: {},
+    calc: basis.fn.$null
+  });
+
+  var calcIndexPreset_seed = 1;
+  function getUniqueCalcIndexId(){
+    return 'calc-index-preset-' + (calcIndexPreset_seed++).lead(8);
+  }
+
+  function percentOfRange(getter, events){
+    var minIndex = 'min_' + getUniqueCalcIndexId();
+    var maxIndex = 'max_' + getUniqueCalcIndexId();
+    var indexes = {};
+
+    getter = basis.getter(getter);
+    indexes[minIndex] = min(getter, events);
+    indexes[maxIndex] = max(getter, events);
+
+    var calc = function(data, index, object){
+      return (getter(object) - index[minIndex]) / (index[maxIndex] - index[minIndex]);
+    };
+
+    return calc.preset = new CalcIndexPreset({
+      indexes: indexes,
+      calc: calc
+    });
+  }
+
+  function percentOfMax(getter, events){
+    var maxIndex = 'max_' + getUniqueCalcIndexId();
+    var indexes = {};
+
+    getter = basis.getter(getter);
+    indexes[maxIndex] = max(getter, events);
+
+    var calc = function(data, index, object){
+      return getter(object) / index[maxIndex];
+    };
+
+    return calc.preset = new CalcIndexPreset({
+      indexes: indexes,
+      calc: calc
+    });
+  }
+
+  function percentOfSum(getter, events){
+    var sumIndex = 'sum_' + getUniqueCalcIndexId();
+    var indexes = {};
+
+    getter = basis.getter(getter);
+    indexes[sumIndex] = sum(getter, events);
+
+    var calc = function(data, index, object){
+      return getter(object) / index[sumIndex];
+    };
+
+    return calc.preset = new CalcIndexPreset({
+      indexes: indexes,
+      calc: calc
+    });
+  }
+
+
  /**
   * @class
   */
@@ -634,9 +721,10 @@
       var indexes = this.indexes;
       this.indexes = {};
       this.indexes_ = {};
-
-      this.calcs = this.calcs || {};
       this.indexValues = {};
+
+      var calcs = this.calcs;
+      this.calcs = {};
 
       if (!this.keyMap || this.keyMap instanceof KeyObjectMap == false)
         this.keyMap = new KeyObjectMap(Object.complete({
@@ -648,6 +736,7 @@
       MapFilter.prototype.init.call(this);
 
       Object.iterate(indexes, this.addIndex, this);
+      Object.iterate(calcs, this.addCalc, this);
     },
 
     addIndex: function(key, index){
@@ -662,7 +751,7 @@
           }
           else
           {
-            /** @cut */ if (typeof console != 'undefined') console.warn('Index `{0}` already exists'.format(key));
+            ;;;basis.dev.warn('Index `{0}` already exists'.format(key));
             return;
           }
         }
@@ -690,7 +779,10 @@
           // warn
         }
       }
-      /** @cut */else if (typeof console != 'undefined') console.warn('Index `{0}` already exists'.format(key));
+      else
+      {
+        ;;;basis.dev.warn('Index `{0}` already exists'.format(key));
+      }
     },
 
     removeIndex: function(key){
@@ -706,11 +798,28 @@
       }
     },
 
-    addCalc: function(name, calc){
-      this.calcs[name] = calc;
+    addCalc: function(name, calcCfg){
+      if (calcCfg instanceof CalcIndexPreset)
+      {
+        this.calcs[name] = calcCfg.calc;
+        for (var indexName in calcCfg.indexes)
+          this.addIndex(indexName, calcCfg.indexes[indexName]);
+      }
+      else
+        this.calcs[name] = calcCfg;
+
       this.recalcRequest();
     },
     removeCalc: function(name){
+      var calcCfg = this.calcs[name];
+
+      if (calcCfg && calcCfg.preset instanceof CalcIndexPreset)
+      {
+        var indexes = calcCfg.preset.indexes;
+        for (var indexName in indexes)
+          this.removeIndex(indexName, indexes[indexName]);
+      }
+
       delete this.calcs[name];
     },
 
@@ -806,6 +915,11 @@
     avg: avg,
     max: max,
     min: min,
+
+    CalcIndexPreset: CalcIndexPreset,
+    percentOfRange: percentOfRange,
+    percentOfMax: percentOfMax,
+    percentOfSum: percentOfSum,
 
     IndexMap: IndexMap
   };

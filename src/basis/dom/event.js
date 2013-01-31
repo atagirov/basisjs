@@ -1,7 +1,4 @@
 
-  basis.require('basis.dom');
-
-
  /**
   * @namespace basis.dom.event
   */
@@ -11,8 +8,7 @@
   // for better pack
 
   var document = global.document;
-  var dom = basis.dom;
-  var $null = Function.$null;
+  var $null = basis.fn.$null;
   var arrayFrom = basis.array.from;
 
   var W3CSUPPORT = !!document.addEventListener;
@@ -83,7 +79,7 @@
   }
 
  /**
-  * Function wraper with thisObject as context.
+  * Function wrapper with thisObject as context.
   * @class
   */
   var Handler = function(handler, thisObject){
@@ -92,21 +88,63 @@
   };
 
  /**
+  * @class
+  */
+  var Event = basis.Class(null, {
+    className: namespace + '.Event',
+
+    KEY: KEY,
+
+    init: function(event){
+      event = wrap(event);
+
+      basis.object.extend(basis.object.complete(this, event), { 
+        event_: event,
+
+        sender: sender(event),
+
+        key: key(event),
+        charCode: charCode(event),
+
+        mouseLeft: mouseButton(event, MOUSE_LEFT),
+        mouseMiddle: mouseButton(event, MOUSE_MIDDLE),
+        mouseRight: mouseButton(event, MOUSE_RIGHT),
+        mouseX: mouseX(event),
+        mouseY: mouseY(event),
+        wheelDelta: wheelDelta(event)
+      });
+    },
+    stopBubble: function(){
+      cancelBubble(this.event_);
+    },
+    stopPropagation: function(){
+      cancelBubble(this.event_);
+    },
+    preventDefault: function(){
+      cancelDefault(this.event_);
+    },
+    die: function(){
+      this.stopBubble();
+      this.preventDefault();
+    }
+  });
+
+ /**
   * Cross-browser event wrapper.
   * @param {Event} event
   * @return {Event}
   */
   function wrap(event){
-    return event || global.event;
+    return event instanceof Event ? event.event_ : event || global.event;
   }
 
  /**
   * Returns DOM node if possible.
-  * @param {Node|string} object
+  * @param {Node|string} ref
   * @return {Node}
   */
-  function getNode(object){ 
-    return typeof object == 'string' ? dom.get(object) : object;
+  function getNode(ref){ 
+    return typeof ref == 'string' ? document.getElementById(ref) : ref;
   }
 
  /**
@@ -115,8 +153,6 @@
   * @return {Node}
   */
   function sender(event){
-    event = wrap(event);
-
     return event.target || event.srcElement;
   }
 
@@ -125,8 +161,6 @@
   * @param {Event} event
   */
   function cancelBubble(event){
-    event = wrap(event);
-
     if (event.stopPropagation) 
       event.stopPropagation();
     else
@@ -138,8 +172,6 @@
   * @param {Event} event
   */
   function cancelDefault(event){
-    event = wrap(event);
-
     if (event.preventDefault) 
       event.preventDefault();
     else
@@ -169,8 +201,6 @@
   * @return {number}
   */
   function key(event){
-    event = wrap(event);
-
     return event.keyCode || event.which || 0;
   }
 
@@ -180,8 +210,6 @@
   * @return {number}
   */
   function charCode(event){
-    event = wrap(event);
-  
     return event.charCode || event.keyCode || 0;
   }
 
@@ -192,8 +220,6 @@
   * @return {boolean}
   */
   function mouseButton(event, button){
-    event = wrap(event);
-
     if (typeof event.which == 'number')
       // DOM scheme
       return event.which == button.VALUE;
@@ -208,8 +234,6 @@
   * @return {number}
   */
   function mouseX(event){
-    event = wrap(event);
-
     if (event.changedTouches)               // touch device
       return event.changedTouches[0].pageX;
     else
@@ -225,8 +249,6 @@
   * @return {number}
   */
   function mouseY(event){
-    event = wrap(event);
-
     if (event.changedTouches)             // touch device
       return event.changedTouches[0].pageY;
     else                                  // all others
@@ -242,15 +264,15 @@
   * @return {number} -1, 0, 1
   */
   function wheelDelta(event){
-    event = wrap(event);
+    var delta = 0;
 
     if ('wheelDelta' in event) 
-      return event.wheelDelta / 120; // IE, webkit, opera
+      delta = event.wheelDelta; // IE, webkit, opera
     else
       if (event.type == 'DOMMouseScroll')
-        return -event.detail / 3;    // gecko
-      else
-        return 0;                  // not a mousewheel event
+        delta = -event.detail;    // gecko
+
+    return delta / Math.abs(delta);
   }
 
   //
@@ -269,7 +291,7 @@
   * @private
   * @const
   */
-  var noCaptureScheme = !document.addEventListener;
+  var noCaptureScheme = !W3CSUPPORT;
 
  /**
   * Observe handlers for event
@@ -307,7 +329,10 @@
       releaseEvent(eventType);
 
     addGlobalHandler(eventType, handler, thisObject);
-    captureHandlers[eventType] = globalHandlers[eventType][globalHandlers[eventType].length - 1];
+    captureHandlers[eventType] = {
+      handler: handler,
+      thisObject: thisObject
+    };
   }
 
  /**
@@ -333,12 +358,9 @@
     if (handlers)
     {
       // search for similar handler, returns if found (prevent for handler dublicates)
-      for (var i = handlers.length; i-- > 0;)
-      {
-        var handlerObject = handlers[i];
-        if (handlerObject.handler === handler && handlerObject.thisObject === thisObject)
+      for (var i = 0, item; item = handlers[i]; i++)
+        if (item.handler === handler && item.thisObject === thisObject)
           return;
-      }
     }
     else
     {
@@ -443,7 +465,7 @@
           item.handler.call(item.thisObject, event);
       };
 
-      if (node.addEventListener) 
+      if (W3CSUPPORT) 
         // W3C DOM event model
         node.addEventListener(eventType, eventTypeHandlers.fireEvent, false);
       else 
@@ -557,79 +579,7 @@
   //
   // on document load event dispatcher
   //
-
- /**
-  * Attach load handlers for page
-  * @function
-  * @param {function(event)} handler 
-  * @param {object=} thisObject Context for handler
-  */
-  var onLoad = basis.ready; /*(function(){
-    // Matthias Miller/Mark Wubben/Paul Sowden/Dean Edwards/John Resig and Me :)
-
-    var fired = false;
-    var loadHandler = [];
-
-    function fireHandlers(e){
-      if (!fired++)
-        for (var i = 0; i < loadHandler.length; i++)
-          loadHandler[i].callback.call(loadHandler[i].thisObject);
-    }
-
-    // The DOM ready check for Internet Explorer
-    function doScrollCheck() {
-      try {
-        // If IE is used, use the trick by Diego Perini
-        // http://javascript.nwbox.com/IEContentLoaded/
-        document.documentElement.doScroll("left");
-        fireHandlers();
-      } catch(e) {
-        setTimeout(doScrollCheck, 1);
-      }
-    }
-
-    if (typeof window != 'undefined')
-    {
-      if (W3CSUPPORT)
-      {
-        // use the real event for browsers that support it (all modern browsers support it)
-        addHandler(document, "DOMContentLoaded", fireHandlers);
-      }
-      else
-      {
-        // ensure firing before onload,
-  			// maybe late but safe also for iframes
-        addHandler(document, "readystatechange", fireHandlers);
-
-        // If IE and not a frame
-  			// continually check to see if the document is ready
-  			try {
-  				if (window.frameElement == null && document.documentElement.doScroll)
-            doScrollCheck();
-  			} catch(e) {
-  			}
-      }
-
-      // A fallback to window.onload, that will always work
-      addHandler(global, "load", fireHandlers);
-    }
-
-    // return attach function
-    return function(callback, thisObject){
-      if (!fired)
-      {
-        loadHandler.push({
-          callback: callback,
-          thisObject: thisObject
-        });
-      }
-      else
-      {
-        ;;;if (typeof console != 'undefined') console.warn('Event.onLoad(): Can\'t attach handler to onload event, because it\'s already fired!');
-      }
-    }
-  })();*/
-
+  
  /**
   * Attach unload handlers for page
   * @param {function(event)} handler 
@@ -667,10 +617,12 @@
       if (!W3CSUPPORT)
       {
         var onevent = 'on' + eventName;
-        var target = dom.createElement(tagName);
-        var host = dom.createElement('div', target);
+        var host = document.createElement('div');
+        var target = host.appendChild(document.createElement(tagName));
 
-        host[onevent] = function(){ bubble = true; };
+        host[onevent] = function(){
+          bubble = true;
+        };
 
         try {
           target.fireEvent(onevent);
@@ -687,38 +639,49 @@
     }
   }
 
+  function wrapEventFunction(fn){
+    return function(event, arg){
+      return fn(wrap(event), arg);
+    }
+  }
+
 
   //
   // export names
   //
 
-  this.setWrapper(wrap);
+  module.setWrapper(wrap);
   module.exports = {
+    // support and testing
     W3CSUPPORT: W3CSUPPORT,
+    browserEvents: browserEvents,
+    getEventInfo: getEventInfo,
 
+    // const
     KEY: KEY,
-
     MOUSE_LEFT: MOUSE_LEFT,
     MOUSE_RIGHT: MOUSE_RIGHT,
     MOUSE_MIDDLE: MOUSE_MIDDLE,
 
-    browserEvents: browserEvents,
-
+    // classes
     Handler: Handler,
+    Event: Event,
 
-    sender: sender,
+    // event functions
+    sender: wrapEventFunction(sender),
 
-    cancelBubble: cancelBubble,
-    cancelDefault: cancelDefault,
-    kill: kill,
+    cancelBubble: wrapEventFunction(cancelBubble),
+    cancelDefault: wrapEventFunction(cancelDefault),
+    kill: wrapEventFunction(kill),
 
-    key: key,
-    charCode: charCode,
-    mouseButton: mouseButton,
-    mouseX: mouseX,
-    mouseY: mouseY,
-    wheelDelta: wheelDelta,
+    key: wrapEventFunction(key),
+    charCode: wrapEventFunction(charCode),
+    mouseButton: wrapEventFunction(mouseButton),
+    mouseX: wrapEventFunction(mouseX),
+    mouseY: wrapEventFunction(mouseY),
+    wheelDelta: wrapEventFunction(wheelDelta),
 
+    // attach & detach event handler helpers
     addGlobalHandler: addGlobalHandler,
     removeGlobalHandler: removeGlobalHandler,
 
@@ -732,8 +695,6 @@
     
     fireEvent: fireEvent,
 
-    onLoad: onLoad,
-    onUnload: onUnload,
-
-    getEventInfo: getEventInfo
+    onLoad: basis.ready,  // deprecated, for backward capability
+    onUnload: onUnload
   };

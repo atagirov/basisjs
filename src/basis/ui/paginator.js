@@ -29,6 +29,16 @@
 
 
   //
+  // definitions
+  //
+
+  var templates = basis.template.define(namespace, {
+    Paginator: resource('templates/paginator/Paginator.tmpl'),
+    PaginatorNode: resource('templates/paginator/PaginatorNode.tmpl')
+  });
+
+
+  //
   // main part
   //
 
@@ -38,6 +48,7 @@
 
   function updateSelection(paginator){
     var node = paginator.childNodes.search(paginator.activePage, 'pageNumber');
+
     if (node)
       node.select();
     else
@@ -53,7 +64,7 @@
 
     event_pageNumberChanged: createEvent('pageNumberChanged', 'oldPageNumber'),
 
-    template: resource('templates/paginator/PaginatorNode.tmpl'),
+    template: templates.PaginatorNode,
 
     binding: {
       pageNumber: {
@@ -113,11 +124,7 @@
   var Paginator = UINode.subclass({
     className: namespace + '.Paginator',
 
-    selection: true,
-    childClass: PaginatorNode,
-
-    template: resource('templates/paginator/Paginator.tmpl'),
-
+    template: templates.Paginator,
     binding: {
       noScroll: {
         events: 'pageCountChanged',
@@ -126,19 +133,29 @@
         }
       }
     },
-
     action: {
       jumpTo: function(actionName, event){
         var scrollbar = this.tmpl.scrollbar;
         var pos = (Event.mouseX(event) - (new Box(scrollbar)).left) / scrollbar.offsetWidth;
+
         this.setSpanStartPage(Math.floor(pos * this.pageCount) - Math.floor(this.pageSpan / 2));
       },
       scroll: function(event){
         var delta = Event.wheelDelta(event);
+        
         if (delta)
+        {
+          // set new offset
           this.setSpanStartPage(this.spanStartPage_ + delta);
+
+          // prevent page scrolling
+          Event.cancelDefault(event);
+        }
       }
     },
+
+    selection: true,
+    childClass: PaginatorNode,
 
     event_activePageChanged: createEvent('activePageChanged'),
     event_pageCountChanged: createEvent('pageCountChanged'),
@@ -222,6 +239,7 @@
     },
     setActivePage: function(newActivePage, spotlightActivePage){
       newActivePage = newActivePage.fit(0, this.pageCount - 1);
+
       if (newActivePage != this.activePage)
       {
         this.activePage = Number(newActivePage);
@@ -240,12 +258,13 @@
     },
     setSpanStartPage: function(pageNumber){
       pageNumber = pageNumber.fit(0, this.pageCount - this.pageSpan);
+
       if (pageNumber != this.spanStartPage_)
       {
         this.spanStartPage_ = pageNumber;
 
-        for (var i = this.childNodes.length; i-- > 0;)
-          this.childNodes[i].setPageNumber(pageNumber + i);
+        for (var i = 0, child; child = this.childNodes[i]; i++)
+          child.setPageNumber(pageNumber + i);
 
         updateSelection(this);
       }

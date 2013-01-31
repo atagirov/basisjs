@@ -2,7 +2,7 @@
   basis.require('app.core');
   basis.require('app.ext.view');
 
-  var getter = Function.getter;
+  var getter = basis.getter;
   var classList = basis.cssom.classList;
 
   var mapDO = app.core.mapDO;
@@ -18,10 +18,10 @@
       tag: 'data:tag || "none"'
     },
     event_match: function(){
-      this.tmpl.set('absent', 'absent');
+      this.tmpl.set('absent', '');
     },
     event_unmatch: function(){
-      this.tmpl.set('absent', '');
+      this.tmpl.set('absent', 'absent');
     }
   });
 

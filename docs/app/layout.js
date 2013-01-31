@@ -15,7 +15,7 @@
   var targetContent = basis.resource('app/layout/targetContent.js')();
 
   targetHeader.setDelegate(targetContent);
-  targetHeader.setDataSource(new basis.dom.wrapper.ChildNodesDataset({ sourceNode: targetContent }));
+  targetHeader.setDataSource(targetContent.getChildNodesDataset());
 
   var navTree = basis.resource('app/layout/navTree.js')();
   var searchTree = basis.resource('app/layout/searchTree.js')();
@@ -173,7 +173,7 @@
 
   Event.addGlobalHandler('keydown', function(e){
     var event = Event(e);
-    if (event.ctrlKey || event.shiftKey || event.altKey || prototypeMapPopup().visible)
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || prototypeMapPopup().visible)
       return;
 
     DOM.focus(searchInput.tmpl.field, !searchInput.focused);

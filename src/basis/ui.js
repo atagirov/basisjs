@@ -1,15 +1,13 @@
 
   basis.require('basis.timer');
   basis.require('basis.l10n');
+  basis.require('basis.data');
   basis.require('basis.dom.wrapper');
   basis.require('basis.cssom');
   basis.require('basis.template.html');
 
 
  /**
-  * Classes:
-  *   {basis.ui.Node}, {basis.ui.PartitionNode}, {basis.ui.GroupingNode}
-  *
   * @namespace basis.ui
   */
 
@@ -21,15 +19,16 @@
   //
 
   var document = global.document;
+
   var Class = basis.Class;
   var DOM = basis.dom;
   var cssom = basis.cssom;
 
-  var Template = basis.template.html.Template;
   var classList = basis.cssom.classList;
-  var getter = Function.getter;
+  var getter = basis.getter;
   var createEvent = basis.event.create;
 
+  var Template = basis.template.html.Template;
   var DWNode = basis.dom.wrapper.Node;
   var DWPartitionNode = basis.dom.wrapper.PartitionNode;
   var DWGroupingNode = basis.dom.wrapper.GroupingNode;
@@ -57,36 +56,59 @@
       var def = null;
       var value = extension[key];
 
-      if (value)
+      // NOTE: check for Node, because first call of extendBinding happens before Node declared
+      if (Node && value instanceof Node)
       {
-        value = BINDING_PRESET.process(key, value);
-
-        if (typeof value != 'object')
+        def = {
+          events: 'satelliteChanged',
+          getter: (function(key, satellite){
+            var init = basis.fn.runOnce(function(node){
+              node.setSatellite(key, satellite);
+              ;;;if (node.satellite[key] !== satellite) basis.dev.warn('basis.ui.binding: implicit satellite `' + key + '` attach to owner failed');
+            });
+            return function(node){
+              init(node);
+              return node.satellite[key] ? node.satellite[key].element : null;
+            };
+          })(key, value)
+        };
+      }
+      else
+      {
+        if (value)
         {
-          def = {
-            getter: getter(value)
-          };
-        }
-        else
-          if (Array.isArray(value))
+          if (typeof value == 'string')
+            value = BINDING_PRESET.process(key, value);
+          else
+            // getter is function that returns value if value is basis.Token or basis.data.Object instance
+            // those sort of instance have mechanism (via bindingBridge) to update itself
+            // TODO: basis.data.DataObject should be replace for basis.data.AbstractData
+            if (value instanceof basis.Token || (value instanceof basis.data.DataObject && value.bindingBridge))
+              value = basis.fn.$const(value);
+
+          if (typeof value != 'object')
           {
             def = {
-              getter: getter(value[0]),
-              events: value[1]
+              getter: getter(value)
             };
           }
           else
-          {
-            def = {
-              getter: getter(value.getter),
-              events: value.events
-            };
-          }
+            if (Array.isArray(value))
+            {
+              def = {
+                getter: getter(value[0]),
+                events: value[1]
+              };
+            }
+            else
+            {
+              def = {
+                getter: getter(value.getter),
+                events: value.events
+              };
+            }
+        }
       }
-
-      /*def.update = function(node){
-        return node.tmpl.set(key, this.getter(node));
-      };*/
 
       binding[key] = def;
     }
@@ -101,22 +123,22 @@
     return {
       add: function(prefix, func){
         if (!presets[prefix])
+        {
           presets[prefix] = func;
-
-        /** @cut */else console.warn('Preset `' + prefix + '` already exists, new definition ignored');
+        }
+        else
+        {
+          ;;;basis.dev.warn('Preset `' + prefix + '` already exists, new definition ignored');
+        }
       },
       process: function(key, value){
         var preset;
+        var m = value.match(prefixRegExp);
 
-        if (typeof value == 'string')
+        if (m)
         {
-          var m = value.match(prefixRegExp);
-
-          if (m)
-          {
-            preset = presets[m[1]];
-            value = m[2] || key;
-          }
+          preset = presets[m[1]];
+          value = m[2] || key;
         }
 
         return preset
@@ -146,11 +168,7 @@
   });
 
   BINDING_PRESET.add('l10n', function(token){
-    return Function.$const(basis.l10n.getToken(token));
-  });
-
-  BINDING_PRESET.add('resource', function(url){
-    return Function.$const(basis.resource(url));
+    return basis.fn.$const(basis.l10n.getToken(token));
   });
 
 
@@ -161,30 +179,32 @@
     selected: {
       events: 'select unselect',
       getter: function(node){
-        return node.selected ? 'selected' : '';
+        return node.selected;
       }
     },
     unselected: {
       events: 'select unselect',
       getter: function(node){
-        return node.selected ? '' : 'unselected';
+        return !node.selected;
       }
     },
     disabled: {
       events: 'disable enable',
       getter: function(node){
-        return node.disabled || node.contextDisabled ? 'disabled' : '';
+        return node.disabled || node.contextDisabled;
       }
     },
     enabled: {
       events: 'disable enable',
       getter: function(node){
-        return node.disabled || node.contextDisabled ? '' : 'enabled';
+        return !(node.disabled || node.contextDisabled);
       }
     },
     state: {
       events: 'stateChanged',
-      getter: 'state'
+      getter: function(node){
+        return String(node.state);
+      }
     },
     childCount: {
       events: 'childNodesModified',
@@ -195,13 +215,13 @@
     hasChildren: {
       events: 'childNodesModified',
       getter: function(node){
-        return !!node.firstChild ? 'hasChildren' : '';
+        return !!node.firstChild;
       }
     },
     empty: {
       events: 'childNodesModified',
       getter: function(node){
-        return !node.firstChild ? 'empty' : '';
+        return !node.firstChild;
       }
     }
   }, extendBinding);
@@ -527,11 +547,14 @@
             this.childNodesElement = null;
           }
 
-          if (oldElement && !this.element)
+          if (oldElement)
           {
-            var parentNode = oldElement && oldElement.parentNode;
-            if (parentNode && parentNode.nodeType == DOM.ELEMENT_NODE)
-              parentNode.removeChild(oldElement);
+            if (!this.element || this.element != oldElement)
+            {
+              var parentNode = oldElement && oldElement.parentNode;
+              if (parentNode && parentNode.nodeType == DOM.ELEMENT_NODE)
+                parentNode.removeChild(oldElement);
+            }
           }
 
           // ??? fire event
@@ -615,7 +638,7 @@
     return {
       // methods
       insertBefore: function(newChild, refChild){
-        ;;;if (this.noChildNodesElement){ this.noChildNodesElement = false; console.warn('Bug: Template has no childNodesElement container, but insertBefore call'); }
+        ;;;if (this.noChildNodesElement){ this.noChildNodesElement = false; basis.dev.warn('Bug: Template has no childNodesElement container, but insertBefore call'); }
 
         // inherit
         newChild = super_.insertBefore.call(this, newChild, refChild);
@@ -628,10 +651,10 @@
         var insertPoint = nextSibling && nextSibling.element.parentNode == container ? nextSibling.element : null;
 
         var element = newChild.element;
-        var refNode = insertPoint || container.insertPoint || null;
+        var refNode = insertPoint || container.insertPoint || null; // NOTE: null at the end for IE
 
         if (element.parentNode !== container || element.nextSibling !== refNode) // prevent dom update
-          container.insertBefore(element, refNode); // NOTE: null at the end for IE
+          container.insertBefore(element, refNode);
           
         return newChild;
       },
@@ -669,7 +692,7 @@
         super_.clear.call(this, alive);
       },
       setChildNodes: function(childNodes, keepAlive){
-        ;;;if (this.noChildNodesElement){ this.noChildNodesElement = false; console.warn('Template has no childNodesElement container, probably it is bug'); }
+        ;;;if (this.noChildNodesElement){ this.noChildNodesElement = false; basis.dev.warn('Template has no childNodesElement container, probably it is bug'); }
 
         // reallocate childNodesElement to new DocumentFragment
         var domFragment = DOM.createFragment();

@@ -25,25 +25,22 @@
   //
 
   var Class = basis.Class;
-  var nsData = basis.data;
-
+  var complete = basis.object.complete;
+  var arrayFrom = basis.array.from;
+  var $undef = basis.fn.$undef;
+  var getter = basis.getter;
+  var nullGetter = basis.fn.nullGetter;
+  var oneFunctionProperty = Class.oneFunctionProperty;
   var createEvent = basis.event.create;
   var events = basis.event.events;
+
   var LISTEN = basis.event.LISTEN;
+  var SUBSCRIPTION = basis.data.SUBSCRIPTION;
+  var STATE = basis.data.STATE;
 
-  var SUBSCRIPTION = nsData.SUBSCRIPTION;
-  var DataObject = nsData.DataObject;
-  var AbstractDataset = nsData.AbstractDataset;
-  var Dataset = nsData.Dataset;
-
-  var STATE = nsData.STATE;
-
-  var arrayFrom = basis.array.from;
-  var getter = Function.getter;
-  var nullGetter = Function.nullGetter;
-  var $undef = Function.$undef;
-  var complete = Object.complete;
-  var oneFunctionProperty = Class.oneFunctionProperty;
+  var DataObject = basis.data.DataObject;
+  var AbstractDataset = basis.data.AbstractDataset;
+  var Dataset = basis.data.Dataset;
 
 
   //
@@ -587,12 +584,9 @@
     * @constructor
     */
     init: function(){
-
       var dataSource = this.dataSource;
       var childNodes = this.childNodes;
       var grouping = this.grouping;
-
-      ;;;if (('autoDelegateParent' in this) && typeof console != 'undefined') console.warn('autoDelegateParent property is deprecate. Use autoDelegate instead');
 
       if (dataSource)
         this.dataSource = null; // NOTE: reset dataSource before inherit -> prevent double subscription activation
@@ -634,25 +628,13 @@
           this.dataSource = null;
       }
 
-      // process satellite
-      if (!this.satellite)
-        this.satellite = {};
-      else
-      {
-        var satelliteListen = this.listen.satellite;
-        for (var key in this.satellite)
-        {
-          var satellite = this.satellite[key];
-
-          if (satellite instanceof AbstractNode)
-            satellite.setOwner(this);
-
-          if (satelliteListen)
-            satellite.addHandler(satelliteListen, this);
-
-          this.event_satelliteChanged(key, null);
-        }  
-      }
+      // process satellites
+      var satellites = this.satellite;
+      this.satellite = {};
+      
+      if (satellites)
+        for (var key in satellites)
+          this.setSatellite(key, satellites[key]);
 
       if (this.satelliteConfig !== NULL_SATELLITE_CONFIG)
       {
@@ -674,51 +656,12 @@
         }
       }
 
+      // process owner
       var owner = this.owner;
       if (owner)
       {
         this.owner = null;
         this.setOwner(owner);
-      }
-    },
-
-   /**
-    * Set replace satellite with defined name for new one.
-    * @param {string} name Satellite name.
-    * @param {basis.dom.wrapper.AbstractNode} satellite New satellite node.
-    */
-    setSatellite: function(name, satellite){
-      var oldSatellite = this.satellite[name];
-
-      if (satellite instanceof DataObject == false)
-        satellite = null;
-
-      if (oldSatellite != satellite && !this.satelliteConfig[name])
-      {
-        var satelliteListen = this.listen.satellite;
-
-        if (oldSatellite)
-        {
-          if (oldSatellite instanceof AbstractNode)
-            oldSatellite.setOwner(null);
-          if (satelliteListen)
-            oldSatellite.removeHandler(satelliteListen, this);
-        }
-
-        if (satellite)
-          this.satellite[name] = satellite;
-        else
-          delete this.satellite[name];
-
-        if (satellite)
-        {
-          if (satellite instanceof AbstractNode)
-            satellite.setOwner(this);
-          if (satelliteListen)
-            satellite.addHandler(satelliteListen, this);
-        }
-
-        this.event_satelliteChanged(name, oldSatellite);
       }
     },
 
@@ -812,6 +755,46 @@
           this.setDelegate(owner);
       }
     },
+
+   /**
+    * Set replace satellite with defined name for new one.
+    * @param {string} name Satellite name.
+    * @param {basis.dom.wrapper.AbstractNode} satellite New satellite node.
+    */
+    setSatellite: function(name, satellite){
+      var oldSatellite = this.satellite[name];
+      
+      if (satellite instanceof DataObject == false)
+        satellite = null;
+
+      if (oldSatellite != satellite && !this.satelliteConfig[name])
+      {
+        var satelliteListen = this.listen.satellite;
+
+        if (oldSatellite)
+        {
+          if (oldSatellite instanceof AbstractNode)
+            oldSatellite.setOwner(null);
+          if (satelliteListen)
+            oldSatellite.removeHandler(satelliteListen, this);
+        }
+
+        if (satellite)
+          this.satellite[name] = satellite;
+        else
+          delete this.satellite[name];
+
+        if (satellite)
+        {
+          if (satellite instanceof AbstractNode)
+            satellite.setOwner(this);
+          if (satelliteListen)
+            satellite.addHandler(satelliteListen, this);
+        }
+
+        this.event_satelliteChanged(name, oldSatellite);
+      }
+    },    
 
    /**
     * Returns 
@@ -1041,7 +1024,7 @@
             var oldChild = this.dataSourceMap_[delegateId];
 
             delete this.dataSourceMap_[delegateId];
-            oldChild.canHaveDelegate = true; // allow delegate drop
+            oldChild.canSetDelegate = true; // allow delegate drop
             this.removeChild(oldChild);
 
             deleted.push(oldChild);
@@ -1059,12 +1042,12 @@
             cascadeDestroy: false,     // NOTE: it's important set cascadeDestroy to false, otherwise
                                        // there will be two attempts to destroy node - 1st on delegate
                                        // destroy, 2nd on object removal from dataSource
-            //canHaveDelegate: false,  // NOTE: we can't set canHaveDelegate in config, because it
+            //canSetDelegate: false,   // NOTE: we can't set canSetDelegate in config, because it
                                        // prevents delegate assignment
             delegate: item
           });
 
-          newChild.canHaveDelegate = false; // prevent delegate override
+          newChild.canSetDelegate = false; // prevent delegate override
 
           // insert
           this.dataSourceMap_[item.basisObjectId] = newChild;
@@ -1142,7 +1125,7 @@
     if (!child)
       throw EXCEPTION_NULL_CHILD;
 
-    ;;;if (typeof console != 'undefined') console.warn(EXCEPTION_BAD_CHILD_CLASS + ' (expected ' + (node.childClass && node.childClass.className) + ' but ' + (child && child.constructor && child.constructor.className) + ')');
+    ;;;basis.dev.warn(EXCEPTION_BAD_CHILD_CLASS + ' (expected ' + (node.childClass && node.childClass.className) + ' but ' + (child && child.constructor && child.constructor.className) + ')');
     throw EXCEPTION_BAD_CHILD_CLASS;
   }
 
@@ -2310,7 +2293,7 @@
       this.map_ = {};
       this.nullGroup = new PartitionNode();
 
-      ;;;if ('titleGetter' in this) console.warn(namespace + '.GroupingNode: titleGetter is not support anymore for GroupingNode; extend partition nodes with titleGetter instead');
+      ;;;if ('titleGetter' in this) basis.dev.warn(namespace + '.GroupingNode: titleGetter is not support anymore for GroupingNode; extend partition nodes with titleGetter instead');
 
       AbstractNode.prototype.init.call(this);
     },

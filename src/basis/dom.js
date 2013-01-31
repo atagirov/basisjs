@@ -36,11 +36,12 @@
 
   var namespace = this.path;
 
+
   // import names
   var document = global.document;
   var Class = basis.Class;
   var arrayFrom = basis.array.from;
-  var getter = Function.getter;
+  var getter = basis.getter;
 
   // element for DOM support tests
   var testElement = document.createElement('div');
@@ -105,14 +106,14 @@
   // init functions depends on browser support
   if (typeof testElement.compareDocumentPosition == 'function')
   {
-    // W3C DOM scheme
+    // W3C DOM
     comparePosition = function(nodeA, nodeB){
       return nodeA.compareDocumentPosition(nodeB);
     };
   }
   else
   {
-    // IE6-8 DOM scheme
+    // IE6-8
     comparePosition = function(nodeA, nodeB){
       if (nodeA == nodeB)
         return 0;
@@ -123,7 +124,7 @@
       if (nodeA.sourceIndex > nodeB.sourceIndex)
         return POSITION_PRECEDING | (POSITION_CONTAINS * nodeB.contains(nodeA));
       else
-        return POSITION_FOLLOWING  | (POSITION_CONTAINED_BY * nodeA.contains(nodeB));
+        return POSITION_FOLLOWING | (POSITION_CONTAINED_BY * nodeA.contains(nodeB));
     };
   }
 
@@ -136,20 +137,22 @@
 
   if (typeof Node != 'undefined')
   {
-    isNode = function(node){ return node instanceof Node; };
+    isNode = function(node){
+      return node instanceof Node;
+    };
 
     // add support for node.contains (generally for Firefox)
     if (!Node.prototype.contains)
-    {
       Node.prototype.contains = function(node){
         return !!(this.compareDocumentPosition(node) & POSITION_CONTAINED_BY);
       };
-    }
   }
   else
   {
     // IE6-IE8 version
-    isNode = function(node){ return node && node.ownerDocument === document; };
+    isNode = function(node){
+      return node && node.ownerDocument === document;
+    };
   }
 
  /**
@@ -165,10 +168,10 @@
       : null;
   }
 
-  /**
+ /**
   * Note: Tree nodes should have properties: parentNode, nextSibling, prevSibling, firstChild,
-  * lastChild, nodeType
-  * @class TreeWalker
+  * lastChild
+  * @class
   */
   var TreeWalker = Class(null, {
     className: namespace + '.TreeWalker',
@@ -187,7 +190,7 @@
     * Default filter function.
     * @type {function()}
     */
-    filter: Function.$true,
+    filter: basis.fn.$true,
 
    /**
     * @param {Node|object} root
@@ -422,7 +425,7 @@
     var walker, cursor;
     var result = [];
 
-    filter = typeof filter == 'string' ? getter(filter) : filter || Function.$true;
+    filter = typeof filter == 'string' ? getter(filter) : filter || basis.fn.$true;
 
     if (axis & (AXIS_SELF | AXIS_ANCESTOR_OR_SELF | AXIS_DESCENDANT_OR_SELF))
       if (filter(root))
@@ -535,8 +538,10 @@
     var result = document.createDocumentFragment();
     var len = arguments.length;
     var array = createFragment.array = [];
+
     for (var i = 0; i < len; i++)
       array.push(handleInsert(result, arguments[i]));
+    
     return result;
   }
 
@@ -800,7 +805,7 @@
   *   basis.dom.wrap([1,2,3,4,5], { 'SPAN.match': function(val, idx){ return idx % 2 } });
   *   // result: [1, <span class="match">2</span>, 3, <span class="match">4</span>, 5]
   *
-  *   basis.dom.wrap([1,2,3], { A: Function.$true, B: function(val, idx){ return val == 3 } });
+  *   basis.dom.wrap([1,2,3], { A: basis.fn.$true, B: function(val, idx){ return val == 3 } });
   *   // result: [<a>1</a>, <a>2</a>, <b><a>3</a></b>]
   * @param {Array} array
   * @param {object} map
@@ -808,7 +813,7 @@
   */
   function wrap(array, map, getter){
     var result = [];
-    getter = Function.getter(getter || Function.$self);
+    getter = basis.getter(getter || basis.fn.$self);
     for (var k in map)
       for (var i = 0; i < array.length; i++)
       {
@@ -951,7 +956,7 @@
       insert(head(), node);
     else
     {
-      ;;;if (typeof console != 'undefined') console.warn('Can\'t append to head, document not found');
+      ;;;basis.dev.warn('Can\'t append to head, document not found');
     }
   }
 

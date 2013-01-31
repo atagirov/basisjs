@@ -1,6 +1,5 @@
 
   basis.require('basis.dom');
-  basis.require('basis.dom.event');
 
 
  /**
@@ -17,18 +16,18 @@
   var document = global.document;
   var location = global.location;
   var path = basis.path;
-  var dom = basis.dom;
-  var event = basis.dom.event;
+  var arrayFrom = basis.array.from;
   var Class = basis.Class;
   var cleaner = basis.cleaner;
-  var arrayFrom = basis.array.from;
+  var dom = basis.dom;
+  var DOMTokenList = global.DOMTokenList;
 
 
   //
   // main part
   //
 
-  var CLASSLIST_SUPPORTED = global.DOMTokenList && document && document.documentElement.classList instanceof global.DOMTokenList;
+  var CLASSLIST_SUPPORTED = DOMTokenList && document && document.documentElement.classList instanceof DOMTokenList;
   var IMPORTANT_REGEXP = /\s*!important/i;
   var IMPORTANT = String('important');
   var GENERIC_RULE_SEED = 1;
@@ -242,7 +241,7 @@
         try {
           style.cssText = style.cssText.replace(new RegExp(rxText, 'i'), newValue);
         } catch(e) {
-          ;;;if (typeof console != 'undefined') console.warn('basis.cssom.setStyleProperty: Can\'t set wrong value `' + mapping.value + '` for ' + mapping.key + ' property');
+          ;;;basis.dev.warn('basis.cssom.setStyleProperty: Can\'t set wrong value `' + mapping.value + '` for ' + mapping.key + ' property');
         }
       }
     }
@@ -257,7 +256,7 @@
         try {
           node.style[mapping.key] = mapping.value;
         } catch(e) {
-          ;;;if (typeof console != 'undefined') console.warn('basis.cssom.setStyleProperty: Can\'t set wrong value `' + mapping.value + '` for ' + mapping.key + ' property');
+          ;;;basis.dev.warn('basis.cssom.setStyleProperty: Can\'t set wrong value `' + mapping.value + '` for ' + mapping.key + ' property');
         }
       }
       else
@@ -599,12 +598,12 @@
       return this.element.className.qw()[index];
     },
     add: function(token){ 
-      ;;;if (arguments.length > 1) console.warn('classList.add accept only one argument');
+      ;;;if (arguments.length > 1) basis.dev.warn('classList.add accepts only one argument');
       if (!this.element.className.match(tokenRegExp(token)))
         this.element.className += ' ' + token;
     },
     remove: function(token){
-      ;;;if (arguments.length > 1) console.warn('classList.remove accept only one argument');
+      ;;;if (arguments.length > 1) basis.dev.warn('classList.remove accepts only one argument');
       var className = this.element.className;
       var newClassName = className.replace(tokenRegExp(token), '');
       if (newClassName != className)
@@ -688,7 +687,7 @@
   if (CLASSLIST_SUPPORTED)
   {
     var proto = ClassList.prototype;
-    Object.extend(global.DOMTokenList.prototype, {
+    Object.extend(DOMTokenList.prototype, {
       set: proto.set,
       replace: proto.replace,
       bool: proto.bool,

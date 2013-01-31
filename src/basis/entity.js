@@ -14,25 +14,24 @@
 
   var Class = basis.Class;
 
-  var keys = Object.keys;
-  var extend = Object.extend;
-  var complete = Object.complete;
-  var arrayFrom = Array.from;
-  var $self = Function.$self;
-  var getter = Function.getter;
+  var keys = basis.object.keys;
+  var extend = basis.object.extend;
+  var complete = basis.object.complete;
+  var arrayFrom = basis.array.from;
+  var $self = basis.fn.$self;
+  var getter = basis.getter;
   var arrayFrom = basis.array.from;
 
   var EventObject = basis.event.EventObject;
   var createEvent = basis.event.create;
 
-  var nsData = basis.data;
-
-  var AbstractDataset = nsData.AbstractDataset;
-  var Dataset = nsData.Dataset;
-  var Collection = nsData.dataset.Subset;
-  var Grouping = nsData.dataset.Split;
-  var DataObject = nsData.DataObject;
-  var STATE = nsData.STATE;
+  var DataObject = basis.data.DataObject;
+  var Slot = basis.data.Slot;
+  var AbstractDataset = basis.data.AbstractDataset;
+  var Dataset = basis.data.Dataset;
+  var Collection = basis.data.dataset.Subset;
+  var Grouping = basis.data.dataset.Split;
+  var STATE = basis.data.STATE;
 
   var NULL_INFO = {};
 
@@ -122,28 +121,66 @@
 
 
   function CalculateField(){
-    var args = arrayFrom(arguments);
-    var func = args.pop();
+    var names = arrayFrom(arguments);
+    var calcFn = names.pop();
+    var foo = names[0];
+    var bar = names[1];
+    var baz = names[2];
+    var result;
 
-    ;;;if (typeof func != 'function') basis.dev.warn('Last argument for calculate field constructor must be a function');
+    if (typeof calcFn != 'function')
+      throw 'Last argument for calculate field constructor must be a function';
 
-    var cond = [];
-    var calcArgs = [];
-    for (var i = 0, name; i < args.length; i++)
+    switch (names.length)
     {
-      name = args[i].quote('"');
-      cond.push(name + ' in delta');
-      calcArgs.push('data[' + name + ']');
+      case 0:
+        result = function(){
+          return calcFn();
+        };
+        break;
+      case 1:
+        result = function(delta, data, oldValue){
+          if (foo in delta)
+            return calcFn(data[foo]);
+
+          return oldValue;
+        };
+        break;
+      case 2:
+        result = function(delta, data, oldValue){
+          if (foo in delta || bar in delta)
+            return calcFn(data[foo], data[bar]);
+
+          return oldValue;
+        };
+        break;
+      case 3:
+        result = function(delta, data, oldValue){
+          if (foo in delta || bar in delta || baz in delta)
+            return calcFn(data[foo], data[bar], data[baz]);
+
+          return oldValue;
+        };
+        break;
+      default:
+        result = function(delta, data, oldValue){
+          var changed = false;
+          var args = [];
+
+          for (var i = 0, name; name = names[i]; i++)
+          {
+            changed = changed || name in delta;
+            args.push(data[name]);
+          }
+
+          if (changed)
+            return calcFn.apply(null, args);
+
+          return oldValue;
+        };
     }
 
-    var result = new Function('calc',
-      'return function(delta, data, oldValue){' +
-        (cond.length ? 'if (' + cond.join(' || ') + ')' : '') +
-        'return calc(' + calcArgs.join(', ') + ');' +
-        (cond.length ? 'return oldValue;' : '') +
-      '}'
-    )(func);
-    result.args = args;
+    result.args = names;
     result.calc = result;
     return result;
   }
@@ -204,7 +241,7 @@
   var EntitySet = Class(Dataset, {
     className: namespace + '.EntitySet',
 
-    wrapper: Function.$self,
+    wrapper: $self,
 
     init: ENTITYSET_INIT_METHOD(Dataset, 'EntitySet'),
     sync: ENTITYSET_SYNC_METHOD(Dataset),
@@ -231,10 +268,10 @@
   var ReadOnlyEntitySet = Class(EntitySet, {
     className: namespace + '.ReadOnlyEntitySet',
 
-    set: Function.$false,
-    add: Function.$false,
-    remove: Function.$false,
-    clear: Function.$false
+    set: basis.fn.$false,
+    add: basis.fn.$false,
+    remove: basis.fn.$false,
+    clear: basis.fn.$false
   });
 
   //
@@ -480,13 +517,6 @@
  /**
   * @class
   */
-  var Slot = Class(DataObject, {
-    className: namespace + '.Slot'
-  });
-
- /**
-  * @class
-  */
   var EntityTypeConstructor = Class(null, {
     className: namespace + '.EntityType',
     name: 'UntitledEntityType',
@@ -546,7 +576,7 @@
             name: name,
             wrapper: wrapper,
             source: this.all,
-            rule: config.collections[name] || Function.$true
+            rule: config.collections[name] || basis.fn.$true
           });
         }
       }
@@ -560,12 +590,10 @@
             name: name,
             wrapper: wrapper,
             source: this.all,
-            rule: config.groupings[name] || Function.$true
+            rule: config.groupings[name] || basis.fn.$true
           });
         }
       }
-
-      ;;;if (config.reflections) basis.dev.warn('Reflections are deprecated');
 
       entityClass__ = this.entityClass = Entity(this, this.all, this.index__, this.slot_, this.fields, this.defaults, this.getters).extend({
         entityType: this,
@@ -792,7 +820,7 @@
             data = tmp;
           }
 
-          slot = this.slot_[id] = new DataObject({
+          slot = this.slot_[id] = new Slot({
             delegate: this.get(id),
             data: data
           });
@@ -908,7 +936,7 @@
     return Class(BaseEntity, getters, {
       className: namespace + '.Entity',
 
-      canHaveDelegate: false,
+      canSetDelegate: false,
       //index: index__,
 
       modified: null,

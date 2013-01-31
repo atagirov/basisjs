@@ -6,6 +6,7 @@
  /**
   * @namespace basis.ui.menu
   */
+
   var namespace = this.path;
 
 
@@ -14,14 +15,25 @@
   //
 
   var Class = basis.Class;
-  var getter = Function.getter;
+  var getter = basis.getter;
 
   var DIR = basis.ui.popup.DIR;
   var Popup = basis.ui.popup.Popup;
-
   var UINode = basis.ui.Node;
   var UIPartitionNode = basis.ui.PartitionNode;
   var UIGroupingNode = basis.ui.GroupingNode;
+
+
+  //
+  // definitions
+  //
+
+  var templates = basis.template.define(namespace, {
+    MenuItem: resource('templates/menu/MenuItem.tmpl'),
+    MenuItemSet: resource('templates/menu/MenuItemSet.tmpl'),
+    PartitionNode: resource('templates/menu/PartitionNode.tmpl'),
+    Menu: resource('templates/menu/Menu.tmpl')
+  });
 
 
   //
@@ -36,15 +48,13 @@
 
     childClass: Class.SELF,
 
-    template: resource('templates/menu/MenuItem.tmpl'),
-
+    template: templates.MenuItem,
     binding: {
       caption: 'caption'
     },
-
     action: {
       click: function(event){
-        if (!this.isDisabled() && !(this instanceof MenuItemSet))
+        if (!this.isDisabled())
         {
           if (this.click)
             this.click();
@@ -54,17 +64,17 @@
       }
     },
 
-    caption: '[untitled]',
-
     defaultHandler: function(node){
       if (this.parentNode)
         this.parentNode.defaultHandler(node);
     },
 
-    setCaption: function(newCaption){
-      this.caption = newCaption;
+    caption: '[untitled]',
+    setCaption: function(caption){
+      this.caption = caption;
       this.updateBind('caption');
     },
+
     click: null
   });
 
@@ -74,7 +84,7 @@
   var MenuItemSet = Class(MenuItem, {
     className: namespace + '.MenuItemSet',
 
-    template: resource('templates/menu/MenuItemSet.tmpl')
+    template: templates.MenuItemSet
   });
 
  /**
@@ -83,7 +93,7 @@
   var MenuPartitionNode = Class(UIPartitionNode, {
     className: namespace + '.PartitionNode',
 
-    template: resource('templates/menu/PartitionNode.tmpl')
+    template: templates.PartitionNode
   });
 
  /**
@@ -91,6 +101,7 @@
   */
   var MenuGroupingNode = Class(UIGroupingNode, {
     className: namespace + '.MenuGroupingNode',
+
     childClass: MenuPartitionNode
   });
 
@@ -99,20 +110,21 @@
   */
   var Menu = Class(Popup, {
     className: namespace + '.Menu',
-    childClass: MenuItem,
+
+    template: templates.Menu,
 
     defaultDir: [DIR.LEFT, DIR.BOTTOM, DIR.LEFT, DIR.TOP].join(' '),
-    subMenu: null,
+
+    childClass: MenuItem,
 
     groupingClass: MenuGroupingNode,
     grouping: getter('groupId'),
 
     defaultHandler: function(node){
       this.hide();
-    },
-
-    template: resource('templates/menu/Menu.tmpl')
+    }
   });
+
 
   //
   // export names

@@ -1,6 +1,8 @@
 
   basis.require('basis.event');
   basis.require('basis.net');
+  basis.require('basis.net.rpc');
+
 
  /**
   * @namespace basis.net.service
@@ -8,12 +10,17 @@
 
   var namespace = this.path;
 
-  var EventObject = basis.event.EventObject;
 
-  var AjaxTransport = basis.net.AjaxTransport;
-  var AjaxRequest = basis.net.AjaxRequest;
+  //
+  // import names
+  //
 
   var createEvent = basis.event.create;
+  var createRpc = basis.net.rpc.createRpc;
+
+  var Emitter = basis.event.Emitter;
+  var AjaxTransport = basis.net.AjaxTransport;
+
 
  /**
   * @class Service
@@ -29,13 +36,12 @@
   };
 
 
-  var Service = EventObject.subclass({
+  var Service = Emitter.subclass({
     className: namespace + '.Service',
 
     inprogressTransports: null,
 
     transportClass: AjaxTransport,
-    requestClass: AjaxRequest,
 
     event_sessionOpen: createEvent('sessionOpen'),
     event_sessionClose: createEvent('sessionClose'),
@@ -44,26 +50,27 @@
 
     isSecure: false,
 
-    prepare: Function.$true,
-    signature: Function.$undef,
-    isSessionExpiredError: Function.$false,
+    prepare: basis.fn.$true,
+    signature: basis.fn.$undef,
+    isSessionExpiredError: basis.fn.$false,
 
     init: function(){
-      EventObject.prototype.init.call(this);
+      ;;;if (this.requestClass) basis.dev.warn(namespace + '.Service#requestClass is not supported; set requestClass via transportClass')
+
+      Emitter.prototype.init.call(this);
 
       this.inprogressTransports = [];
 
       var TransportClass = this.transportClass;
-
-      this.transportClass = this.transportClass.subclass({
+      this.transportClass = TransportClass.subclass({
         service: this,
 
         needSignature: this.isSecure,
 
-        event_failure: function(req){
-          TransportClass.prototype.event_failure.call(this, req);
+        event_failure: function(request){
+          TransportClass.prototype.event_failure.call(this, request);
 
-          if (this.needSignature && this.service.isSessionExpiredError(req))
+          if (this.needSignature && this.service.isSessionExpiredError(request))
           {
             this.service.freeze();
             this.service.stoppedTransports.push(this);
@@ -79,12 +86,10 @@
             return;
 
           return TransportClass.prototype.request.call(this, requestData);
-        },
-
-        requestClass: this.requestClass
+        }
       });
 
-      this.addHandler(SERVICE_HANDLER, this);
+      this.addHandler(SERVICE_HANDLER);
     },
 
     sign: function(transport){
@@ -95,8 +100,7 @@
       }
       else
       {
-        ;;; if (typeof console != 'undefined') console.warn('Request skipped. Service session is not opened');
-        return false;
+        ;;;basis.dev.warn('Request ignored. Service have no session key');
       }
     },
 
@@ -134,10 +138,8 @@
 
     unfreeze: function(){
       if (this.stoppedTransports)
-      {
         for (var i = 0, transport; transport = this.stoppedTransports[i]; i++)
           transport.resume();
-      }
 
       this.event_sessionUnfreeze();
     },
@@ -146,13 +148,19 @@
       return new this.transportClass(config);
     },
 
-    destroy: function(){
-      delete this.inprogressTransports;
-      delete this.stoppedTransports;
-      delete this.sessionData;
-      delete this.sessionKey;
+    createAction: function(config){
+      return createRpc(basis.object.complete({
+        service: this
+      }, config));
+    },
 
-      EventObject.prototype.destroy.call(this);
+    destroy: function(){
+      this.inprogressTransports = null;
+      this.stoppedTransports = null;
+      this.sessionKey = null;
+      this.sessionData = null;
+
+      Emitter.prototype.destroy.call(this);
     }
   });
 
@@ -161,4 +169,4 @@
   //
   module.exports = {
     Service: Service
-  }
+  };

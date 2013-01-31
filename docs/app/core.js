@@ -1,21 +1,24 @@
 
+  basis.require('basis.timer');
+  basis.require('basis.event');
+  basis.require('basis.data');
+  basis.require('basis.entity');
+  basis.require('basis.net');
+
   // import names
 
-  var getter = Function.getter;
+  var getter = basis.getter;
 
   var nsData = basis.data;
   var nsEntity = basis.entity;
-  var nsAjax = basis.net.ajax;
+  var nsAjax = basis.net;
 
   var TimeEventManager = basis.timer.TimeEventManager;
 
   // main part
 
-  var urlResolver_ = document.createElement('A');
-
   function resolveUrl(value){
-    urlResolver_.href = value.replace(/^\.\//, '../');
-    return urlResolver_.href;
+    return basis.path.resolve(value.replace(/^\.\//, '../'));
   }
 
 
@@ -42,7 +45,7 @@
       line: Number,
       text: String,
       context: String,
-      tags: Function.$self
+      tags: basis.fn.$self
     }
   });
 
@@ -102,8 +105,7 @@
         var p = value.match(/^\s*\{([^\}]+)\}\s+(\S+)(?:\s+((?:.|[\r\n])+))?/i);
         if (!p)
         {
-          if (typeof console != 'undefined')
-            console.warn('jsdoc parse error: ', value, text);
+          basis.dev.warn('jsdoc parse error: ', value, text);
         }
         else
         {
@@ -128,8 +130,7 @@
         var p = value.match(/^\s*\{([^\}]+)\}(?:\s+(.+))?/i);
         if (!p)
         {
-          if (typeof console != 'undefined')
-            console.warn('jsdoc parse error: ', this.data.path, value, p);
+          basis.dev.warn('jsdoc parse error: ', this.data.path, value, p);
         }
         else
         {
@@ -153,7 +154,7 @@
         var desc = sup.docsProto_[p[1]];
         if (desc)
         {
-          //console.log(path + ' -> ' + desc.cls.className);
+          //basis.dev.log(path + ' -> ' + desc.cls.className);
           this.setInheritDoc(JsDocEntity(desc.cls.className + '.prototype.' + p[1]));
         }
       }
@@ -286,7 +287,7 @@
 
     if (deep > 8)
     {
-      ;;;if (typeof console != 'undefined') console.log('Deep more than 8 for path:', path);
+      ;;;basis.dev.log('Deep more than 8 for path:', path);
       return;
     }
 
@@ -330,7 +331,7 @@
 
       if (mapDO[fullPath])
       {
-        console.log('double scan: ', fullPath);
+        ;;;basis.dev.log('double scan: ', fullPath);
         continue;
       }
 
@@ -504,7 +505,7 @@
     scope: basis.namespaces_,
     context: 'object'
   });
-  if (typeof console != 'undefined') console.log(Date.now() - walkStartTime, '/', walkThroughCount);
+  basis.dev.log(Date.now() - walkStartTime, '/', walkThroughCount);
 
   //
   // --------------------------------
@@ -519,7 +520,7 @@
 
     var m = func.toString().match(/^\s*function(\s+\S+)?\s*\((\s*(?:\S+|\/\*[^*]+\*\/)(\s*(?:,\s*\S+|\/\*[^*]+\*\/))*\s*)?\)/);
     if (!m)
-      console.log('Function parse error: ' + func.toString());
+      basis.dev.log('Function parse error: ' + func.toString());
 
     var name = String(m[1] || 'anonymous').trim();
     var args = String(m[2] || '').replace(/\s*,\s*/g, ', ');
@@ -677,7 +678,7 @@
     queue: [],
     loaded: {},
     curResource: null,
-    transport: Function.lazyInit(function(){
+    transport: basis.fn.lazyInit(function(){
       var transport = new nsAjax.Transport();
 
       transport.addHandler({
@@ -700,8 +701,7 @@
       return transport;
     }),
     addResource: function(url, kind){
-      urlResolver_.href = url;
-      url = urlResolver_.href;
+      url = basis.path.resolve(url);
       if (!this.loaded[url])
       {
         this.queue.push({
@@ -734,7 +734,7 @@
           text: '/** @namespace ' + ns.path + '*/' + ns.source_
         }
       : null;
-  }).filter(Function.$isNotNull);
+  }).filter(basis.fn.$isNotNull);
 
   var resolveResStart = new Date;
   function resolveRes(){
@@ -745,7 +745,7 @@
       setTimeout(resolveRes, 0);
     }
     else
-      console.log(new Date - resolveResStart);
+      basis.dev.log(new Date - resolveResStart);
   }
   setTimeout(resolveRes, 0);
 

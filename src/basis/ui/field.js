@@ -25,26 +25,52 @@
   var Event = basis.dom.event;
   var DOM = basis.dom;
 
-  var complete = Object.complete;
-  var coalesce = Object.coalesce;
-  var getter = Function.getter;
+  var complete = basis.object.complete;
+  var getter = basis.getter;
   var arrayFrom = basis.array.from;
-
   var createEvent = basis.event.create;
   var events = basis.event.events;
+  var l10nToken = basis.l10n.getToken;
 
   var Property = basis.data.property.Property;
-
   var Selection = basis.dom.wrapper.Selection;
   var UINode = basis.ui.Node;
   var Popup = basis.ui.popup.Popup;
 
 
   //
-  // Localization
+  // definitions
   //
 
-  var l10nToken = basis.l10n.getToken;
+  var templates = basis.template.define(namespace, {
+    Example: resource('templates/field/Example.tmpl'),
+    Description: resource('templates/field/Description.tmpl'),
+    Counter: resource('templates/field/Counter.tmpl'),
+
+    Field: resource('templates/field/Field.tmpl'),
+    File: resource('templates/field/File.tmpl'),
+    Hidden: resource('templates/field/Hidden.tmpl'),
+    Text: resource('templates/field/Text.tmpl'),
+    Password: resource('templates/field/Password.tmpl'),
+    Textarea: resource('templates/field/Textarea.tmpl'),
+    Checkbox: resource('templates/field/Checkbox.tmpl'),
+    Label: resource('templates/field/Label.tmpl'),
+
+    RadioGroup: resource('templates/field/RadioGroup.tmpl'),
+    RadioGroupItem: resource('templates/field/RadioGroupItem.tmpl'),
+
+    CheckGroup: resource('templates/field/CheckGroup.tmpl'),
+    CheckGroupItem: resource('templates/field/CheckGroupItem.tmpl'),
+
+    Select: resource('templates/field/Select.tmpl'),
+    SelectItem: resource('templates/field/SelectItem.tmpl'),
+
+    Combobox: resource('templates/field/Combobox.tmpl'),
+    ComboboxItem: resource('templates/field/ComboboxItem.tmpl'),
+    ComboboxDropdownList: resource('templates/field/ComboboxDropdownList.tmpl'),
+    
+    MatchInput: resource('templates/field/MatchInput.tmpl')
+  });
 
   basis.l10n.createDictionary(namespace, __dirname + 'l10n/field', {
     "symbolsLeft": "Symbols left"
@@ -71,6 +97,10 @@
   /** @const */ var VALIDITY_VALID = 'valid';
   /** @const */ var VALIDITY_INVALID = 'invalid';
 
+  function getFieldValue(field){
+    return field.getValue();
+  }
+
 
   //
   //  Fields
@@ -92,6 +122,8 @@
     nextFieldOnEnter: true,
     serializable: true,
 
+    name: '',
+    title: '',
     validity: VALIDITY_INDETERMINATE,
     error: '',
     example: null,
@@ -118,13 +150,12 @@
     event_fieldKeyup: createEvent('fieldKeyup', 'event') && function(event){
       if (this.nextFieldOnEnter)
       {
-        var keyCode = Event.key(event);
-        if (keyCode == Event.KEY.ENTER || keyCode == Event.KEY.CTRL_ENTER)
+        if (event.key == event.KEY.ENTER || event.key == event.KEY.CTRL_ENTER)
         {
-          Event.cancelDefault(event);
+          event.preventDefault();
           this.commit();
         }
-        else if (keyCode != Event.KEY.TAB)
+        else if (event.key != event.KEY.TAB)
           this.setValidity();
       }
 
@@ -148,19 +179,21 @@
     // template
     //
 
-    template: resource('templates/field/Field.tmpl'),
+    template: templates.Field,
     binding: {
-      name: 'name || ""',
-      titleText: 'title || ""',
       focused: {
         events: 'fieldFocus fieldBlur',
         getter: function(node){
           return node.focused ? 'focused' : '';
         }
       },
+      name: 'name',
+      titleText: 'title',
       value: {
         events: 'change',
-        getter: 'getValue()'
+        getter: function(node){
+          return node.getValue();
+        }
       },
       defaultValue: {
         getter: 'defaultValue'
@@ -198,7 +231,7 @@
           return owner.example;
         },
         instanceOf: UINode.subclass({
-          template: resource('templates/field/Example.tmpl'),
+          template: templates.Example,
           binding: {
             example: 'owner.example'
           },
@@ -219,7 +252,7 @@
           return owner.description;
         },
         instanceOf: UINode.subclass({
-          template: resource('templates/field/Description.tmpl'),
+          template: templates.Description,
           binding: {
             description: 'owner.description'
           },
@@ -239,7 +272,6 @@
     //
 
     init: function(){
-      this.name = this.name || '';
       this.validators = arrayFrom(this.validators);
 
       if (typeof this.defaultValue == 'undefined')
@@ -354,7 +386,7 @@
   var File = Field.subclass({
     className: namespace + '.File',
 
-    template: resource('templates/field/File.tmpl')
+    template: templates.File
   });
 
  /**
@@ -370,12 +402,14 @@
     readOnly: false,
     minLength: 0,
     maxLength: 0,
+    autocomplete: '',
+    placeholder: '',
 
     binding: {
       minlength: {
         events: 'minLengthChanged',
         getter: function(field){
-          return field.minLength > 0 ? field.minLength : "";
+          return field.minLength > 0 ? field.minLength : '';
         }
       },
       maxlength: {
@@ -387,8 +421,8 @@
       readonly: function(node){
         return node.readOnly ? 'readonly' : '';
       },
-      autocomplete: 'autocomplete || ""',
-      placeholder: 'placeholder || ""'
+      autocomplete: 'autocomplete',
+      placeholder: 'placeholder'
     },
 
     init: function(){
@@ -464,7 +498,7 @@
 
     focusable: false,
 
-    template: resource('templates/field/Hidden.tmpl')
+    template: templates.Hidden
   });
 
  /**
@@ -473,7 +507,7 @@
   var Text = TextField.subclass({
     className: namespace + '.Text',
 
-    template: resource('templates/field/Text.tmpl')
+    template: templates.Text
   });
 
 
@@ -483,7 +517,7 @@
   var Password = TextField.subclass({
     className: namespace + '.Password',
 
-    template: resource('templates/field/Password.tmpl')
+    template: templates.Password
   });
 
 
@@ -500,14 +534,14 @@
     event_fieldFocus: !window.opera
       ? TextField.prototype.event_fieldFocus
         // fix opera's bug: when invisible textarea becomes visible and user
-        // changes it content, value property returns empty string instead value in field
+        // changes it content, value property returns empty string instead of field value
       : function(event){
           this.contentEditable = true;
           this.contentEditable = false;
           TextField.prototype.event_fieldFocus.call(this, event);
         },
 
-    template: resource('templates/field/Textarea.tmpl'),
+    template: templates.Textarea,
 
     binding: {
       availChars: {
@@ -532,7 +566,7 @@
           return owner.maxLength > 0;
         },
         instanceOf: UINode.subclass({
-          template: resource('templates/field/Counter.tmpl'),
+          template: templates.Counter,
 
           binding: {
             availChars: function(node){
@@ -574,7 +608,7 @@
 
     value: false,
 
-    template: resource('templates/field/Checkbox.tmpl'),
+    template: templates.Checkbox,
 
     binding: {
       checked: {
@@ -605,7 +639,7 @@
 
     focusable: false,
 
-    template: resource('templates/field/Label.tmpl')
+    template: templates.Label
   });
 
 
@@ -620,11 +654,17 @@
     className: namespace + '.ComplexFieldItem',
 
     childClass: null,
+    name: '',
 
     binding: {
-      name: 'name || ""',
-      title: 'getTitle()',
-      value: 'getValue()',
+      name: 'name',
+      title: function(node){
+        return node.getTitle();
+
+      },
+      value: function(node){
+        return node.getValue();
+      },
       checked: {
         events: 'select unselect',
         getter: function(item){
@@ -639,13 +679,13 @@
         {
           this.select(this.parentNode.multipleSelect);
 
-          if (Event.sender(event).tagName != 'INPUT')
-            Event.kill(event);
+          if (event.sender.tagName != 'INPUT')
+            event.die();
         }
       }
     },
 
-    titleGetter: Function.getter(function(item){
+    titleGetter: basis.getter(function(item){
       return item.title || item.getValue();
     }),
     valueGetter: getter('value'),
@@ -692,7 +732,7 @@
       Field.prototype.init.call(this);
     },
     getValue: function(){
-      var value = this.selection.getItems().map(getter('getValue()'));
+      var value = this.selection.getItems().map(getFieldValue);
       return this.multipleSelect ? value : value[0];
     },
     setValue: function(value/* value[] */){
@@ -718,12 +758,12 @@
   var RadioGroup = ComplexField.subclass({
     className: namespace + '.RadioGroup',
 
-    template: resource('templates/field/RadioGroup.tmpl'),
+    template: templates.RadioGroup,
 
     childClass: {
       className: namespace + '.RadioGroupItem',
 
-      template: resource('templates/field/RadioGroupItem.tmpl')
+      template: templates.RadioGroupItem
     }
   });
 
@@ -740,12 +780,12 @@
 
     multipleSelect: true,
 
-    template: resource('templates/field/CheckGroup.tmpl'),
+    template: templates.CheckGroup,
 
     childClass: {
       className: namespace + '.CheckGroupItem',
 
-      template: resource('templates/field/CheckGroupItem.tmpl')
+      template: templates.CheckGroupItem
     }
   });
 
@@ -760,12 +800,12 @@
   var Select = ComplexField.subclass({
     className: namespace + '.Select',
 
-    template: resource('templates/field/Select.tmpl'),
+    template: templates.Select,
 
     childClass: {
       className: namespace + '.SelectItem',
 
-      template: resource('templates/field/SelectItem.tmpl')
+      template: templates.SelectItem,
     },
 
     init: function(){
@@ -778,7 +818,7 @@
       return item && item.getValue();
     },
     setValue: function(value){
-      var item = this.childNodes.search(value, 'getValue()');
+      var item = this.childNodes.search(value, getFieldValue);
       this.selection.set([item]);
       this.tmpl.field.selectedIndex = item ? this.childNodes.indexOf(item) : -1;
     }
@@ -804,10 +844,12 @@
   var ComboboxItem = ComplexFieldItem.subclass({
     className: namespace + '.ComboboxItem',
 
-    template: resource('templates/field/ComboboxItem.tmpl'),
+    template: templates.ComboboxItem,
 
     binding: {
-      title: 'getTitle() || "\xA0"'
+      title: function(node){
+        return node.getTitle() || '\xA0';
+      }
     },
 
     action: {
@@ -819,7 +861,7 @@
           if (this.parentNode)
             this.parentNode.hide();
 
-          Event.kill(event);
+          event.die();
         }
       }
     }
@@ -852,12 +894,12 @@
     popup: null,
     popupClass: Popup.subclass({
       className: namespace + '.ComboboxDropdownList',
-      template: resource('templates/field/ComboboxDropdownList.tmpl'),
+      template: templates.ComboboxDropdownList,
       autorotate: 1
     }),
     property: null,
 
-    template: resource('templates/field/Combobox.tmpl'),
+    template: templates.Combobox,
 
     binding: {
       captionItem: 'satellite:',
@@ -904,18 +946,32 @@
         var cur = this.selection.pick();
         var next;
 
-        switch (Event.key(event))
+        switch (event.key)
         {
-          case Event.KEY.DOWN:
+          case event.KEY.DOWN:
             if (event.altKey)
-              return this.popup.visible ? this.hide() : (!this.isDisabled() ? this.show() : null);
+            {
+              if (this.popup.visible)
+                this.hide();
+              else
+                if (!this.isDisabled())
+                  this.show();
+              return;
+            }
 
             next = DOM.axis(cur ? cur : this.firstChild, DOM.AXIS_FOLLOWING_SIBLING).search(false, 'disabled');
           break;
 
-          case Event.KEY.UP: 
+          case event.KEY.UP: 
             if (event.altKey)
-              return this.popup.visible ? this.hide() : (!this.isDisabled() ? this.show() : null);
+            {
+              if (this.popup.visible)
+                this.hide();
+              else
+                if (!this.isDisabled())
+                  this.show();
+              return;
+            }
 
             next = cur ? DOM.axis(cur, DOM.AXIS_PRESCENDING_SIBLING).search(false, 'disabled') : this.firstChild;
           break;
@@ -924,25 +980,24 @@
         if (next)
         {
           next.select();
-          DOM.focus(this.tmpl.field);
+          this.focus();
         }
 
         this.event_fieldKeyup(event);
       },
       keydown: function(event){
-        switch (Event.key(event))
+        switch (event.key)
         {
-          case Event.KEY.DOWN:
-          case Event.KEY.UP:
-            Event.kill(event);
+          case event.KEY.DOWN:
+          case event.KEY.UP:
+            event.die();
 
             break;
-          case Event.KEY.ENTER:
+          case event.KEY.ENTER:
             if (this.popup.visible)
               this.hide();
 
-            Event.kill(event);
-
+            event.die();
             break;
         }
 
@@ -1019,7 +1074,7 @@
       if (this.getValue() != value)
       {
         // update value & selection
-        var item = this.childNodes.search(value, 'getValue()');
+        var item = this.childNodes.search(value, getFieldValue);
         if (item && !item.isDisabled())
           this.selection.set([item]);
         else
@@ -1185,7 +1240,7 @@
   var MatchInput = Text.subclass({
     className: namespace + '.MatchInput',
 
-    template: resource('templates/field/MatchInput.tmpl'),
+    template: templates.MatchInput,
 
     matchFilterClass: MatchFilter,
 
@@ -1201,7 +1256,6 @@
 
     init: function(){
       Text.prototype.init.call(this);
-
       this.matchFilter = new this.matchFilterClass(this.matchFilter);
     }
   });
@@ -1239,7 +1293,7 @@
     },
     Required: function(field){
       var value = field.getValue();
-      if (Function.$isNull(value) || value == '')
+      if (basis.fn.$isNull(value) || value == '')
         return new ValidatorError(field, l10nToken(namespace, 'validator', 'required'));
     },
     Number: function(field){
@@ -1266,13 +1320,13 @@
     },
     MinLength: function(field){
       var value = field.getValue();
-      var length = Function.$isNotNull(value.length) ? value.length : String(value).length;
+      var length = basis.fn.$isNotNull(value.length) ? value.length : String(value).length;
       if (length < field.minLength)
         return new ValidatorError(field, String(l10nToken(namespace, 'validator', 'minLengthError')).format(field.minLength));
     },
     MaxLength: function(field){
       var value = field.getValue();
-      var length = Function.$isNotNull(value.length) ? value.length : String(value).length;
+      var length = basis.fn.$isNotNull(value.length) ? value.length : String(value).length;
       if (length > field.maxLength)
         return new ValidatorError(field, String(l10nToken(namespace, 'validator', 'maxLengthError')).format(field.maxLength));
     }

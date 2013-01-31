@@ -67,7 +67,7 @@
 
                 var w = new DOM.TreeWalker(pg, IS_TEXT_NODE);
                 this.is(a2, resolveNodes(w.nodes()));
-                this.is(a1, resolveNodes(w.nodes(Function.$true)));
+                this.is(a1, resolveNodes(w.nodes(basis.fn.$true)));
                 w.next();
                 w.next();
                 this.is(a2, resolveNodes(w.nodes()));
@@ -275,26 +275,6 @@
                 }
                 this.is(r1, DOM.axis(root, DOM.AXIS_CHILD));
                 this.is(r1.filter(IS_TEXT_NODE), DOM.axis(root, DOM.AXIS_CHILD, IS_TEXT_NODE));
-              }
-            },
-            {
-              name: 'test #2',
-              test: function(){
-              }
-            }
-          ]
-        },
-        {
-          name: '...',
-          testcase: [
-            {
-              name: 'test #1',
-              test: function(){
-              }
-            },
-            {
-              name: 'test #2',
-              test: function(){
               }
             }
           ]

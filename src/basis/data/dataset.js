@@ -26,11 +26,12 @@
   var Class = basis.Class;
   var oneFunctionProperty = Class.oneFunctionProperty;
 
-  var extend = Object.extend;
-  var values = Object.values;
-  var $self = Function.$self;
-  var $true = Function.$true;
-  var $false = Function.$false;
+  var extend = basis.object.extend;
+  var values = basis.object.values;
+  var getter = basis.getter;
+  var $self = basis.fn.$self;
+  var $true = basis.fn.$true;
+  var $false = basis.fn.$false;
   var arrayFrom = basis.array.from;
   var createEvent = basis.event.create;
 
@@ -317,7 +318,7 @@
       }
       else
       {
-        ;;;if(typeof console != 'undefined') console.warn(this.className + '.addSource: source isn\'t instance of AbstractDataset');
+        ;;;basis.dev.warn(this.className + '.addSource: source isn\'t instance of AbstractDataset');
       }
     },
 
@@ -350,7 +351,7 @@
       }
       else
       {
-        ;;;if(typeof console != 'undefined') console.warn(this.className + '.removeSource: source isn\'t in dataset source list');
+        ;;;basis.dev.warn(this.className + '.removeSource: source isn\'t in dataset source list');
       }
     },
 
@@ -372,7 +373,7 @@
         }
         else
         {
-          ;;;if(typeof console != 'undefined') console.warn(this.className + '.setSources: source isn\'t type of AbstractDataset', source);
+          ;;;basis.dev.warn(this.className + '.setSources: source isn\'t type of AbstractDataset', source);
         }
       }
 
@@ -964,7 +965,7 @@
    /**
     * Helper function.
     */
-    rule: Function.getter($true),
+    rule: getter($true),
 
    /**
     * Events list when dataset should recompute rule for source item.
@@ -1327,9 +1328,6 @@
       var sourceObjectInfo;
       var inserted = delta.inserted;
       var deleted = delta.deleted;
-
-      //var d = new Date;
-      //console.profile();
      
       // delete comes first to reduce index size -> insert will be faster
       if (deleted)
@@ -1390,9 +1388,6 @@
           index.sort(sliceIndexSort);
       }
 
-      //console.profileEnd();
-      //console.log('Slice: ', new Date - d, buildIndex);
-
       this.applyRule();
     }
   };
@@ -1409,7 +1404,7 @@
     * @type {function(basis.data.DataObject)}
     * @readonly
     */
-    rule: Function.getter($true),
+    rule: getter($true),
 
    /**
     * Events list when dataset should recompute rule for source item.
@@ -1718,7 +1713,7 @@
    /**
     * @type {function(basis.data.DataObject)}
     */
-    rule: Function.getter($false),
+    rule: getter($false),
 
    /**
     * Events list when dataset should recompute rule for source item.

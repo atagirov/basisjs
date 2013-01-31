@@ -20,21 +20,38 @@
   // import names
   //
 
-  var oneFunctionProperty = basis.Class.oneFunctionProperty;
-
   var Event = basis.dom.event;
   var DOM = basis.dom;
+
+  var getter = basis.getter;
+  var arrayFrom = basis.array.from;
+  var $undef = basis.fn.$undef;
+  var $const = basis.fn.$const;
+  var $self = basis.fn.$self;
+  var extend = basis.object.extend;
+  var complete = basis.object.complete;
+  var objSlice = basis.object.slice;
+  var oneFunctionProperty = basis.Class.oneFunctionProperty;
+  var createEvent = basis.event.create;
 
   var DataObject = basis.data.DataObject;
   var AbstractNode = basis.dom.wrapper.AbstractNode;
   var Node = basis.dom.wrapper.Node;
-  var Canvas = basis.ui.canvas.Canvas;
-  var CanvasLayer = basis.ui.canvas.CanvasLayer;
   var Selection = basis.dom.wrapper.Selection;
+  var Canvas = basis.ui.canvas.Canvas;
+  var AbstractCanvas = basis.ui.canvas.AbstractCanvas;
 
-  var createEvent = basis.event.create;
-  var getter = Function.getter;
-  var arrayFrom = basis.array.from;
+
+  //
+  // definitions
+  //
+
+  var templates = basis.template.define(namespace, {
+    Graph: resource('templates/graph/Graph.tmpl'),
+    GraphSelection: resource('templates/graph/GraphSelection.tmpl'),
+    GraphViewer: resource('templates/graph/GraphViewer.tmpl')
+  });
+
 
   //
   // Main part
@@ -49,8 +66,8 @@
     }
     else
     {
-      /0\.(0+)?[^0]/.test(String(number));
-      return (-1) * (RegExp.$1 || '').length - 1;
+      var m = String(number).match(/0\.(0+)?[^0]/);
+      return -(m ? m[1].length : 0) - 1;
     }
   }
 
@@ -103,7 +120,7 @@
       '#BB7BF1',
       '#FF3030',
       '#090',
-      '#6699DD'
+      '#69D'
     ],
 
     listen: {
@@ -167,8 +184,7 @@
 
     childClass: GraphNode,
 
-    template: resource('templates/graph/Graph.tmpl'),
-
+    template: templates.Graph,
     binding: {
       graphSelection: 'satellite:',
       graphViewer: 'satellite:'
@@ -198,7 +214,7 @@
     },
 
     setStyle: function(newStyle){
-      Object.extend(this.style, Object.slice(newStyle, ['strokeStyle', 'lineWidth']));
+      extend(this.style, objSlice(newStyle, ['strokeStyle', 'lineWidth']));
       this.redrawRequest();
     },
 
@@ -206,13 +222,13 @@
       this.updateCount++;
     },
 
-    drawFrame: Function.$undef
+    drawFrame: $undef
   });
 
   //
   // Series Graph
   //
-  var SERIES_SOURCE_HANDLER = {
+  var SERIA_SOURCE_HANDLER = {
     datasetChanged: function(object, delta){
       var key;
       var value;
@@ -227,24 +243,26 @@
           valuesDelta[key] = value;
           this.valuesMap[key] = value;
 
-          child.addHandler(SERIES_ITEM_HANDLER, this);
+          child.addHandler(SERIA_ITEM_HANDLER, this);
         }
 
       if (delta.deleted)
+      {
         for (var i = 0, child; child = delta.deleted[i]; i++)
         {
           key = this.keyGetter(child);
           valuesDelta[key] = null;
-          this.valuesMap[key] = null;
+          this.valuesMap[key] = 0;
 
-          child.removeHandler(SERIES_ITEM_HANDLER, this);
+          child.removeHandler(SERIA_ITEM_HANDLER, this);
         }
+      }
 
       this.event_valuesChanged(valuesDelta);
     } 
   };
 
-  var SERIES_ITEM_HANDLER = {
+  var SERIA_ITEM_HANDLER = {
     update: function(object){ 
       var key = this.keyGetter(object);
       var value = this.valueGetter(object);
@@ -260,15 +278,15 @@
  /**
   * @class
   */
-  var GraphSeries = AbstractNode.subclass({
-    className: namespace + '.GraphSeries',
+  var GraphSeria = AbstractNode.subclass({
+    className: namespace + '.GraphSeria',
 
     valuesMap: null,
 
     sourceGetter: getter('source'),
-    keyGetter: Function.$undef,
+    keyGetter: getter(),
     
-    valueGetter: Function.$const(0),
+    valueGetter: getter($const(0)),
     getValue: function(object, key){
       return this.source ? this.valuesMap[key] : this.valueGetter(object);
     },
@@ -310,15 +328,15 @@
         var oldSource = this.source;
         if (oldSource)
         {
-          oldSource.removeHandler(SERIES_SOURCE_HANDLER, this);
-          SERIES_SOURCE_HANDLER.datasetChanged.call(this, oldSource, { deleted: oldSource.getItems() });
+          oldSource.removeHandler(SERIA_SOURCE_HANDLER, this);
+          SERIA_SOURCE_HANDLER.datasetChanged.call(this, oldSource, { deleted: oldSource.getItems() });
         }
 
         this.source = source;
         if (this.source)
         {
-          this.source.addHandler(SERIES_SOURCE_HANDLER, this);
-          SERIES_SOURCE_HANDLER.datasetChanged.call(this, oldSource, { inserted: this.source.getItems() });
+          this.source.addHandler(SERIA_SOURCE_HANDLER, this);
+          SERIA_SOURCE_HANDLER.datasetChanged.call(this, oldSource, { inserted: this.source.getItems() });
         }
 
         this.event_sourceChanged(oldSource);
@@ -337,14 +355,16 @@
   */
   var GraphSeriesList = Node.subclass({
     className: namespace + '.GraphSeriesList',
-    childClass: GraphSeries,
 
+    event_valuesChanged: createEvent('valuesChanged', 'delta'),
+
+    childClass: GraphSeria,
     childFactory: function(config){
       return new this.childClass(config);
     },
 
     listen: {
-      childNode: {
+      childNode: { // seria
         valuesChanged: function(seria, delta){
           this.event_valuesChanged(seria, delta);
         }
@@ -352,7 +372,7 @@
     },
 
     init: function(){
-      this.colorPicker = new ColorPicker(Object.extend({ owner: this }, this.colorPicker));
+      this.colorPicker = new ColorPicker(extend({ owner: this }, this.colorPicker));
       Node.prototype.init.call(this);
     },
 
@@ -382,14 +402,14 @@
 
       this.redrawRequest();
     },
-    valuesChanged: function(seria, delta){
+    valuesChanged: function(object, seria, delta){
       var needRedraw = false;
 
       var key;
       for (var i = 0, child; child = this.childNodes[i]; i++)
       {
         key = this.keyGetter(child);
-        if (delta[key])
+        if (key in delta)
         {
           if (delta[key])
             child.values[seria.basisObjectId] = delta[key];
@@ -417,6 +437,7 @@
   */
   var SeriesGraphNode = GraphNode.subclass({
     className: namespace + '.SeriesGraphNode',
+
     values: {},
 
     valueChangeEvents: oneFunctionProperty(
@@ -437,9 +458,10 @@
   */
   var SeriesGraph = Graph.subclass({
     className: namespace + '.SeriesGraph',
+
     childClass: SeriesGraphNode,    
 
-    keyGetter: Function.$self,
+    keyGetter: $self,
     keyTitleGetter: function(object){
       return this.keyGetter(object); 
     },
@@ -487,7 +509,7 @@
         };
       }
 
-      this.series = new GraphSeriesList(Object.extend({ owner: this }, this.series));
+      this.series = new GraphSeriesList(extend({ owner: this }, this.series));
       this.series.addHandler(GRAPH_SERIES_HANDLER, this);
       GRAPH_SERIES_HANDLER.childNodesModified.call(this, this.series, { inserted: this.series.childNodes });
     },
@@ -495,7 +517,7 @@
     getValuesForSeria: function(seria){
       var values = [];
       for (var i = 0, child; child = this.childNodes[i]; i++)
-        values.push(child.values[seria.basisObjectId]);
+        values.push(child.values[seria.basisObjectId] || 0);
       
       return values;
     },
@@ -821,7 +843,7 @@
       }  
 
       //save graph data
-      Object.extend(this.clientRect, {
+      extend(this.clientRect, {
         left: LEFT,
         top: TOP,
         width: WIDTH - LEFT - RIGHT,
@@ -916,7 +938,7 @@
     },
 
     // abstract methods
-    drawSeria: Function.$undef
+    drawSeria: $undef
   });
 
 
@@ -931,10 +953,12 @@
     var graphRect = graph.element.getBoundingClientRect();
     return globalX - graphRect.left - graph.clientRect.left;
   }
+
   function getGraphYByMouseY(graph, globalY){
     var graphRect = graph.element.getBoundingClientRect();
     return globalY - graphRect.top - graph.clientRect.top;
   }
+
   function getGraphItemPositionByMouseX(graph, mouseX){
     var width = graph.clientRect.width;
     var itemCount = graph.childNodes.length;
@@ -942,8 +966,7 @@
     return Math.max(0, Math.min(itemCount - 1, Math.round(x / (width / (itemCount - 1)))));
   }
 
-  function rebuildGraphSelection(graph, curItemPosition, startItemPosition)
-  {
+  function rebuildGraphSelection(graph, curItemPosition, startItemPosition){
     var applyItems = graph.childNodes.slice(Math.min(startItemPosition, curItemPosition), Math.max(startItemPosition, curItemPosition) + 1);
 
     var selectedItems = arrayFrom(graph.selection.getItems());
@@ -956,7 +979,8 @@
       var pos;
       for (var i = 0, item; item = applyItems[i]; i++)
       {
-        if ((pos = selectedItems.indexOf(item)) != -1)
+        pos = selectedItems.indexOf(item);
+        if (pos != -1)
           selectedItems.splice(pos, 1); 
       }      
     }
@@ -1040,6 +1064,10 @@
       var curItemPosition = getGraphItemPositionByMouseX(graph, Event.mouseX(event));
       var selectedItems = rebuildGraphSelection(graph, curItemPosition, startItemPosition);
       
+      graph.selection.lastSelectedRange = {
+        start: Math.min(curItemPosition, startItemPosition),
+        end: Math.max(curItemPosition, startItemPosition)
+      };
       graph.selection.set(selectedItems);
 
       for (var i in GRAPH_SELECTION_GLOBAL_HANDLER)
@@ -1056,7 +1084,7 @@
  /**
   * @class
   */
-  var GraphSelection = CanvasLayer.subclass({
+  var GraphSelection = AbstractCanvas.subclass({
     className: namespace + '.GraphSelection',
 
     style: {
@@ -1065,7 +1093,7 @@
       alpha: '.7'
     },
 
-    template: resource('templates/graph/GraphSelection.tmpl'),
+    template: templates.GraphSelection,
 
     listen: {
       owner: {
@@ -1077,7 +1105,7 @@
     },
 
     event_ownerChanged: function(oldOwner){
-      CanvasLayer.prototype.event_ownerChanged.call(this, oldOwner);
+      AbstractCanvas.prototype.event_ownerChanged.call(this, oldOwner);
       
       if (oldOwner && oldOwner.selection)
       {
@@ -1095,8 +1123,11 @@
     },
 
     recalc: function(){
-      this.tmpl.canvas.width = this.owner.tmpl.canvas.width;
-      this.tmpl.canvas.height = this.owner.tmpl.canvas.height;
+      if (this.tmpl.canvas && this.owner.tmpl.canvas)
+      {
+        this.tmpl.canvas.width = this.owner.tmpl.canvas.width;
+        this.tmpl.canvas.height = this.owner.tmpl.canvas.height;
+      }
 
       this.clientRect = this.owner.clientRect;
     },
@@ -1120,7 +1151,7 @@
       var left, right;
       var lastPos = -1;
 
-      Object.extend(this.context, this.style);
+      extend(this.context, this.style);
 
       for (var i = 0; i < this.owner.childNodes.length + 1; i++)
       {
@@ -1150,10 +1181,10 @@
  /**
   * @class
   */
-  var GraphViewer = CanvasLayer.subclass({
+  var GraphViewer = AbstractCanvas.subclass({
     className: namespace + '.GraphViewer',
 
-    template: resource('templates/graph/GraphViewer.tmpl'),
+    template: templates.GraphViewer,
 
     action: {
       move: function(event){
@@ -1182,15 +1213,18 @@
     },
 
     event_ownerChanged: function(oldOwner){
-      CanvasLayer.prototype.event_ownerChanged.call(this, oldOwner);
+      AbstractCanvas.prototype.event_ownerChanged.call(this, oldOwner);
 
       if (this.owner)
         this.recalc();
     },
 
     recalc: function(){
-      this.element.width = this.owner.tmpl.canvas.width;
-      this.element.height = this.owner.tmpl.canvas.height;
+      if (this.tmpl.canvas && this.owner.tmpl.canvas)
+      {
+        this.tmpl.canvas.width = this.owner.tmpl.canvas.width;
+        this.tmpl.canvas.height = this.owner.tmpl.canvas.height;
+      }
 
       this.clientRect = this.owner.clientRect;
       this.max = this.owner.maxValue;
@@ -1255,12 +1289,12 @@
       context.closePath();
 
       context.fillStyle = 'black';
-      context.fillText(keyText, xPosition +.5, TOP + HEIGHT + 5);
+      context.fillText(keyText, xPosition + .5, TOP + HEIGHT + 5);
 
       var labels = [];
 
       var labelPadding = 7;
-      var labelHeight = 10 + 2*labelPadding;
+      var labelHeight = 10 + 2 * labelPadding;
       var labelWidth = 0;
 
       //var key = this.owner.keyGetter(this.owner.childNodes[keyPosition]);
@@ -1280,16 +1314,16 @@
         var valueY = Math.round((1 - value / MAX) * HEIGHT);
         var labelY = Math.max(labelHeight / 2, Math.min(valueY, HEIGHT - labelHeight / 2));
 
-        labels[i] = {
+        labels.push({
           color: seria.getColor(),
           text: valueText,
           valueY: valueY,
           labelY: labelY
-        };
+        });
       }
 
       // adjust label positions 
-      labels = labels.sortAsObject(getter('valueY'));
+      labels = labels.sortAsObject('valueY');
 
       var hasCrossing = true;
       var crossGroup = labels.map(function(label){
@@ -1315,14 +1349,9 @@
         }
       }
 
-      for (var i = 0; i < crossGroup.length; i++)
-      {
-        for (var j = 0; j < crossGroup[i].labels.length; j++)
-        {
-          var label = crossGroup[i].labels[j];
-          label.labelY = crossGroup[i].y - crossGroup[i].height / 2 + j * labelHeight + labelHeight / 2;
-        }
-      }
+      for (var i = 0, group; group = crossGroup[i]; i++)
+        for (var j = 0, label; label = group.labels[j]; j++)
+          label.labelY = group.y - (group.height / 2) + j * labelHeight + (labelHeight / 2);
 
       // draw labels
       var align = keyPosition >= (keyCount / 2) ? -1 : 1;
@@ -1334,21 +1363,20 @@
         context.fillStyle = 'white';
         context.lineWidth = 3;
         context.beginPath();
-        context.arc(xPosition + .5, label.valueY + .5, pointWidth, 0, 2*Math.PI);
+        context.arc(xPosition + .5, label.valueY + .5, pointWidth, 0, 2 * Math.PI);
         context.stroke();         
         context.fill();
         context.closePath();
         
-        
         var tongueSize = 10;
         context.beginPath();
         context.moveTo(xPosition + (pointWidth + 1) * align + .5, label.valueY + .5);
-        context.lineTo(xPosition + (pointWidth + 1 + tongueSize)*align + .5, label.labelY - 5 + .5);
-        context.lineTo(xPosition + (pointWidth + 1 + tongueSize)*align + .5, label.labelY - Math.round(labelHeight / 2) + .5);
-        context.lineTo(xPosition + (pointWidth + 1 + tongueSize)*align + (labelWidth + 2*labelPadding)*align + .5, label.labelY - Math.round(labelHeight / 2) + .5);
-        context.lineTo(xPosition + (pointWidth + 1 + tongueSize)*align + (labelWidth + 2*labelPadding)*align + .5, label.labelY + Math.round(labelHeight / 2) + .5);
-        context.lineTo(xPosition + (pointWidth + 1 + tongueSize)*align + .5, label.labelY + Math.round(labelHeight / 2) + .5);
-        context.lineTo(xPosition + (pointWidth + 1 + tongueSize)*align + .5, label.labelY + 5 + .5);
+        context.lineTo(xPosition + (pointWidth + 1 + tongueSize) * align + .5, label.labelY - 5 + .5);
+        context.lineTo(xPosition + (pointWidth + 1 + tongueSize) * align + .5, label.labelY - Math.round(labelHeight / 2) + .5);
+        context.lineTo(xPosition + (pointWidth + 1 + tongueSize) * align + (labelWidth + 2 * labelPadding) * align + .5, label.labelY - Math.round(labelHeight / 2) + .5);
+        context.lineTo(xPosition + (pointWidth + 1 + tongueSize) * align + (labelWidth + 2 * labelPadding) * align + .5, label.labelY + Math.round(labelHeight / 2) + .5);
+        context.lineTo(xPosition + (pointWidth + 1 + tongueSize) * align + .5, label.labelY + Math.round(labelHeight / 2) + .5);
+        context.lineTo(xPosition + (pointWidth + 1 + tongueSize) * align + .5, label.labelY + 5 + .5);
         context.lineTo(xPosition + (pointWidth + 1) * align + .5, label.valueY + .5);
         context.fillStyle = label.color;
         context.strokeStyle = '#444';
@@ -1359,7 +1387,7 @@
 
         context.fillStyle = 'black';
         context.textAlign = 'right';
-        context.fillText(label.text, xPosition + (pointWidth + tongueSize + labelPadding)*align + (align == 1 ? labelWidth : 0) + .5, label.labelY + 4);
+        context.fillText(label.text, xPosition + (pointWidth + tongueSize + labelPadding) * align + (align == 1 ? labelWidth : 0) + .5, label.labelY + 4);
       }
 
       context.restore();
@@ -1372,7 +1400,7 @@
   var LinearGraph = AxisGraph.subclass({
     className: namespace + '.LinearGraph',
 
-    fillArea: true,
+    fillArea: false,
     style: {
       strokeStyle: '#090',
       lineWidth: 2.5,
@@ -1391,7 +1419,7 @@
 
     init: function(){
       if (this.selection && !(this.selection instanceof Selection))
-        this.selection = Object.complete({ multiple: true }, this.selection);
+        this.selection = complete({ multiple: true }, this.selection);
 
       AxisGraph.prototype.init.call(this);
     },
@@ -1422,10 +1450,10 @@
           context.lineTo(x, y);
       }
 
-      Object.extend(context, this.style);
+      extend(context, this.style);
       context.stroke();
 
-      if (this.fillArea && this.childNodes.length == 1)
+      if (this.fillArea && this.series.childNodes.length == 1)
       {
         context.lineWidth = 0;
         var zeroPosition = min < 0 ? Math.max(0, max) / (max - min) * height : height;
@@ -1450,6 +1478,7 @@
    */
   var BarGraphViewer = GraphViewer.subclass({
     className: namespace + '.BarGraphViewer',
+
     draw: function(x, y){
       var context = this.context;
 
@@ -1557,7 +1586,7 @@
       context.translate(left, top);
       context.fillStyle = color;
 
-      Object.extend(context, this.style);
+      extend(context, this.style);
       context.strokeStyle = '#333';
       context.lineWidth = 1;
 
@@ -1619,9 +1648,11 @@
    */
   var StackedBarGraph = BarGraph.subclass({
     className: namespace + '.StackedBarGraph',
+
     getMaxValue: function(){
       var max = -Infinity;
       var sum;
+
       for (var i = 0, child; child = this.childNodes[i]; i++)
       {
         sum = 0;
@@ -1631,17 +1662,8 @@
         if (sum > max || max == null)
           max = sum;
       }
+
       return max;
-
-      /*var keys = this.getKeys();
-      var series = this.seriesList.childNodes;
-      var values = series[0].getValues(keys);
-      for (var i = 1, seria; seria = series[i]; i++)
-      {
-        seria.getValues(keys).forEach(function(value, pos) { values[pos] += value });
-      }
-
-      return Math.max.apply(null, values);*/
     },
     getBarRect: function(value, seriaPos, barPos, min, max, step, width, height){
       var bar = {};
@@ -1678,7 +1700,7 @@
     ColorPicker: ColorPicker,
     GraphNode: GraphNode,
     Graph: Graph,
-    GraphSeries: GraphSeries,
+    GraphSeria: GraphSeria,
     GraphSeriesList: GraphSeriesList,
     SeriesGraphNode: SeriesGraphNode,
     SeriesGraph: SeriesGraph,

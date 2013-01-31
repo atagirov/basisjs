@@ -4,7 +4,7 @@
   var viewPrototype = basis.resource('app/views/prototype/prototype.js');
   var targetContent = basis.resource('app/layout/targetContent.js');
   
-  var prototypeDataset = new basis.dom.wrapper.ChildNodesDataset({ sourceNode: viewPrototype() });
+  var prototypeDataset = viewPrototype().getChildNodesDataset();
 
 
   var prototypeMapPopupPanel = new basis.ui.Node({
@@ -37,7 +37,7 @@
         }
       }
     }),
-    sorting: Function.getter('data.title'),
+    sorting: basis.getter('data.title'),
     grouping: Object.slice(viewPrototype().grouping, 'groupGetter sorting childClass'.qw())
   });
 
@@ -61,7 +61,7 @@
     },
     matchFilter: {
       node: prototypeMapPopupPanel,
-      textNodeGetter: Function.getter('tmpl.this_data_title')
+      textNodeGetter: basis.getter('tmpl.this_data_title')
     }
   });
 

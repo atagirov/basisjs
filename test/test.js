@@ -139,13 +139,13 @@
         }
       },
 
-      run: Function.$null,
+      run: basis.fn.$null,
 
       isSuccess: function(){
         return this.testCount == this.successCount;
       },
       over: function(error){
-        this.over     = Function.$null;
+        this.over     = basis.fn.$null;
         this.empty    = !error && this.testCount == 0;
         this.result   = !error && this.isSuccess();
         this.error    = error;
@@ -157,10 +157,9 @@
 
         this.event_over();
       },
-      success: Function.$null,
-      fault: Function.$null,
+      success: basis.fn.$null,
+      fault: basis.fn.$null,
       progress: function(diff){
-//          console.log(diff);
         if (diff)
           this.event_progress(diff, this.completeTestCount/(this.totalTestCount || 1));
       },
@@ -187,7 +186,7 @@
     });
 
     var re0001 = new RegExp('\u0001', 'g');
-    var re0002 = new RegExp('\u0002(?!.*\u0002)');
+    var re0002 = new RegExp('\u0002(\\d+)\u0002', 'g');
     var reThisIs = new RegExp('this\\.is\u0002', 'g');
     var Test = Class(AbstractTest, {
       className: namespace + '.Test',
@@ -231,9 +230,8 @@
                       });
 
         // remove & store parenthesis 
-        while (s != (t = s.replace(/\([^\(\)]*\)/, function(m){ parenthesis.push(m); return '\u0002'; })))
+        while (s != (t = s.replace(/\([^\(\)]*\)/, function(m){ var idx = parenthesis.push(m) - 1; return '\u0002' + String(idx) + '\u0002'; })))
           s = t;
-        //console.log(s);
 
         // break into lines
         lines = s.split(/\r?\n|\n?\r/);
@@ -245,7 +243,7 @@
 
         // restore parenthesis
         for (var i = lines.length - 1; i >= 0; i--)
-          while (lines[i] != (t = lines[i].replace(re0002, function(){ return parenthesis.pop(); })))
+          while (lines[i] != (t = lines[i].replace(re0002, function(m, idx){ return parenthesis[idx]; })))
             lines[i] = t;
 
         // restore strings
@@ -276,7 +274,6 @@
           Tester.result = this;
           this.test.call(Tester);
         } catch(e) {
-          console.log(e);
           this.testCount++;
 
           if (typeof e == 'string')
@@ -297,7 +294,6 @@
         {
           var pre;
           element.appendChild(pre = DOM.createElement('DIV.code'));
-//          console.log(this);
 
           var result = new Array();
           var uncomplete = false;
@@ -312,7 +308,7 @@
             {
               var lineError   = this.errorLines[testIndex];
               var isErrorLine = !!lineError;
-              var isBreakLine = this.error && !this.broken && testIndex == this.testCount;
+              var isBreakLine = this.error && !this.broken && testIndex == this.testCount -1;
               var isLastLine  = isBreakLine || (this.broken && testIndex == this.testCount - 1);
 
               if (isBreakLine || isLastLine)

@@ -19,15 +19,26 @@
   // import names
   //
 
-  var EventObject = basis.event.EventObject;
-  var createEvent = basis.event.create;
-
   var DOM = basis.dom;
   var Event = basis.dom.event;
   var cssom = basis.cssom;
   var anim = basis.animation;
 
+  var createEvent = basis.event.create;
+
+  var EventObject = basis.event.EventObject;
   var UINode = basis.ui.Node;
+
+
+  //
+  // definitions
+  //
+
+  var templates = basis.template.define(namespace, {
+    Scrollbar: resource('templates/scroller/Scrollbar.tmpl'),
+    ScrollPanel: resource('templates/scroller/ScrollPanel.tmpl'),
+    ScrollGalleryItem: resource('templates/scroller/ScrollGalleryItem.tmpl')
+  });
 
 
   //
@@ -89,7 +100,6 @@
   var Scroller = EventObject.subclass({
     className: namespace + '.Scroller',
 
-    //className: namespace + '.Scroller',
     minScrollDelta: 0,
     scrollX: true,
     scrollY: true,
@@ -489,10 +499,11 @@
   var Scrollbar = UINode.subclass({
     className: namespace + '.Scrollbar',
 
-    template: resource('templates/scroller/Scrollbar.tmpl'),
+    orientation: '',
 
+    template: templates.Scrollbar,
     binding: {
-      orientation: 'orientation || ""'
+      orientation: 'orientation'
     },
 
     listen: {
@@ -526,9 +537,9 @@
       this.scrollbarSize = this.getScrollbarSize();
       this.trackSize = this.scrollbarSize - this.scrollbarSize * this.getScrollbarPart();
     },
-    getScrollbarSize: Function.$null,
-    getScrollbarPart: Function.$null,
-    getScrollbarPosition: Function.$null
+    getScrollbarSize: basis.fn.$null,
+    getScrollbarPart: basis.fn.$null,
+    getScrollbarPosition: basis.fn.$null
   });
 
   /**
@@ -588,7 +599,7 @@
     event_realign: createEvent('realign'),
     event_updatePosition: createEvent('updatePosition'),
 
-    template: resource('templates/scroller/ScrollPanel.tmpl'),
+    template: templates.ScrollPanel,
 
     binding: {
       horizontalScrollbar: 'satellite:',
@@ -728,7 +739,7 @@
 
     scrollX: false,
     scrollY: false,
-    childTransform: Function.$null,
+    childTransform: basis.fn.$null,
   
     selection: true,
 
@@ -759,7 +770,7 @@
     childClass: UINode.subclass({
       className: namespace + '.ScrollGalleryItem',
 
-      template: resource('templates/scroller/ScrollGalleryItem.tmpl'),
+      template: templates.ScrollGalleryItem,
 
       action: {
         select: function(){
@@ -781,7 +792,7 @@
         startInertia: this.adjustPosition
       }, this);
 
-      if (this.childTransform != Function.$null)
+      if (this.childTransform != basis.fn.$null)
       {
         this.scroller.addHandler({
           updatePosition: this.applyPosition
@@ -834,7 +845,6 @@
       var childPosition = this.scrollX ? child.element.offsetLeft : child.element.offsetTop;
       var childSize = this.scrollX ? child.element.offsetWidth : child.element.offsetHeight;
 
-      //console.log(childPosition + childSize / 2 - startPosition);
       this.setPosition(childPosition + childSize / 2 - startPosition, instantly);
     },
 

@@ -9,16 +9,24 @@
 
   var namespace = this.path;
 
+
+  //
+  // import names
+  //
+
   var ua = basis.ua;
-  var TimeEventManager = basis.timer.TimeEventManager;
+
+  var extend = basis.object.extend;
+  var arrayFrom = basis.array.from;
+  var objectSlice = basis.object.slice;
+  var createEvent = basis.event.create;
 
   var STATE = basis.data.STATE;
 
-  var arrayFrom = basis.array.from;
+  var TimeEventManager = basis.timer.TimeEventManager;
   var DataObject = basis.data.DataObject;
-  var EventObject = basis.event.EventObject;
+  var Emitter = basis.event.Emitter;
 
-  var createEvent = basis.event.create;
 
  /**
   * @function createEvent
@@ -27,8 +35,8 @@
   function createTransportEvent(eventName) {
     var event = createEvent(eventName);
 
-    return function(){
-      event.apply(TransportDispatcher, arguments);
+    return function transportEvent(){
+      event.apply(transportDispatcher, arguments);
 
       if (this.service)
         event.apply(this.service, arguments);
@@ -37,13 +45,31 @@
     };
   }
 
+  function createRequestEvent(eventName) {
+    var event = createEvent(eventName);
+
+    return function requestEvent(){
+      var args = [this].concat(arrayFrom(arguments));
+
+      event.apply(transportDispatcher, args);
+
+      if (this.transport)
+        this.transport['event_' + eventName].apply(this.transport, args);
+
+      event.apply(this, arguments);
+    };
+  }
+
+
+
+  //
+  // transport dispatcher
+  //
   var inprogressTransports = [];
-  //
-  // TransportDispatcher
-  //
-  var TransportDispatcher = new EventObject({
+  var transportDispatcher = new Emitter({
     abort: function(){
       var result = arrayFrom(inprogressTransports);
+
       for (var i = 0; i < result.length; i++)
         result[i].abort();
 
@@ -67,15 +93,24 @@
     className: namespace + '.AbstractRequest',
 
     influence: null,
+    initData: null,
+    requestData: null,
+
+    transport: null,
+
+    event_start: createRequestEvent('start'),
+    event_timeout: createRequestEvent('timeout'),
+    event_abort: createRequestEvent('abort'),
+    event_success: createRequestEvent('success'),
+    event_failure: createRequestEvent('failure'),
+    event_complete: createRequestEvent('complete'),
 
     event_stateChanged: function(oldState){
       DataObject.prototype.event_stateChanged.call(this, oldState);
 
       if (this.influence)
-      {
         for (var i = 0; i < this.influence.length; i++)
           this.influence[i].setState(this.state, this.state.data);
-      }
     },
 
     init: function(){
@@ -90,11 +125,14 @@
       this.influence = null;
     },
 
-    doRequest: Function.$undef,
+    doRequest: basis.fn.$undef,
+    getResponseData: basis.fn.$undef,
 
     destroy: function(){
       DataObject.prototype.destroy.call(this);
 
+      this.initData = null;
+      this.requestData = null;
       this.clearInfluence();
     }
   });
@@ -103,14 +141,14 @@
   * @class AbstractTransport
   */
 
-  var AbstractTransport = EventObject.subclass({
+  var AbstractTransport = Emitter.subclass({
     className: namespace + '.AbstractTransport',
 
     requestClass: AbstractRequest,
 
     requests: null,
     poolLimit: null,
-    poolHashGetter: Function.$true,
+    poolHashGetter: basis.fn.$true,
 
     event_start: createTransportEvent('start'),
     event_timeout: createTransportEvent('timeout'),
@@ -124,7 +162,7 @@
       this.requestQueue = [];
       this.inprogressRequests = [];
 
-      EventObject.prototype.init.call(this);
+      Emitter.prototype.init.call(this);
 
       // handlers
       this.addHandler(TRANSPORT_REQUEST_HANDLER, this);
@@ -134,41 +172,46 @@
     },
 
     getRequestByHash: function(requestHashId){
-      if (!this.requests[requestHashId])
+      var request = this.requests[requestHashId];
+
+      if (!request)
       {
-        var request;
         //find idle transport
-        for (var i in this.requests)
-          if (this.requests[i].isIdle() && !this.requestQueue.has(this.requests[i]))
+        for (var id in this.requests)
+          if (this.requests[id].isIdle() && !this.requestQueue.has(this.requests[id]))
           {
-            request = this.requests[i];
-            delete this.requests[i];
+            request = this.requests[id];
+            delete this.requests[id];
+            break;
           }
 
-        this.requests[requestHashId] = request || new this.requestClass({ transport: this });
+        if (!request)
+          request = new this.requestClass({
+            transport: this
+          });
+
+        this.requests[requestHashId] = request;
       }
 
-      return this.requests[requestHashId];
+      return request;
     },
 
-    prepare: Function.$true,
-    prepareRequestData: Function.$self,
+    prepare: basis.fn.$true,
+    prepareRequestData: basis.fn.$self,
 
     request: function(config){
       if (!this.prepare())
         return;
 
-      var requestData = Object.slice(config);
+      var requestData = objectSlice(config);
+      var requestHashId = this.poolHashGetter(this.prepareRequestData(requestData));
 
-      var requestData = this.prepareRequestData(requestData);
-      var requestHashId = this.poolHashGetter(requestData);
+      var request = this.getRequestByHash(requestHashId, true);
 
-      if (this.requests[requestHashId])
-        this.requests[requestHashId].abort();
+      if (request.initData)
+        request.abort();
 
-      var request = this.getRequestByHash(requestHashId);
-
-      request.initData = Object.slice(config);
+      request.initData = requestData;
       request.requestData = requestData;
       request.setInfluence(requestData.influence || this.influence);
 
@@ -209,7 +252,7 @@
         for (var i = 0, request; request = this.stoppedRequests[i]; i++)
           request.transport.request(request.initData);
 
-        this.stoppedRequests = [];
+        this.stoppedRequests = null;
       }
       this.stopped = false;
     },
@@ -218,12 +261,12 @@
       for (var i in this.requests)
         this.requests[i].destroy();
 
-      delete this.requestData;
-      delete this.requestQueue;
+      this.requests = {};
+      this.inprogressRequests = null;
+      this.requestQueue = null;
+      this.stoppedRequests = null;
 
-      EventObject.prototype.destroy.call(this);
-
-      delete this.requests;
+      Emitter.prototype.destroy.call(this);
     }
   });
 
@@ -264,11 +307,6 @@
   var IS_POST_REGEXP = /POST/i;
   var IS_METHOD_WITH_BODY = /^(POST|PUT|PATCH|LINK|UNLINK)$/i;
   var ESCAPE_CHARS = /[\%\=\&\<\>\s\+]/g;
-
-  // TODO: better debug info out
-  var logOutput = typeof console != 'undefined'
-    ? function(){ console.log(arguments); }
-    : Function.$self;
 
   function escapeValue(value){
     return String(value).replace(ESCAPE_CHARS, function(m){
@@ -337,7 +375,7 @@
                                                                         // IE returns date string with no leading zero and IIS may parse
                                                                         // date wrong and response with code 400
 
-    Object.iterate(Object.extend(headers, requestData.headers), function(key, value){
+    Object.iterate(extend(headers, requestData.headers), function(key, value){
       if (value != null)
         this.setRequestHeader(key, value);
     }, request);
@@ -367,22 +405,22 @@
 
     this.prevReadyState_ = readyState;
 
-    ;;;if (this.debug) logOutput('State: (' + readyState + ') ' + ['UNSENT', 'OPENED', 'HEADERS_RECEIVED', 'LOADING', 'DONE'][readyState]);
+    ;;;if (this.debug) basis.dev.log('State: (' + readyState + ') ' + ['UNSENT', 'OPENED', 'HEADERS_RECEIVED', 'LOADING', 'DONE'][readyState]);
 
     // dispatch self event
-    transport.event_readyStateChanged(this, readyState);
+    this.event_readyStateChanged(readyState);
 
     if (readyState == STATE_DONE)
     {
       this.clearTimeout();
 
       // clean event handler
-      xhr.onreadystatechange = Function.$undef;
+      xhr.onreadystatechange = basis.fn.$undef;
 
       if (typeof xhr.responseText == 'unknown' || (!xhr.responseText && !xhr.getAllResponseHeaders()))
       {
-        transport.event_failure(this);
-        transport.event_abort(this);
+        this.event_failure();
+        this.event_abort();
         newState = STATE.ERROR;
       }
       else
@@ -392,7 +430,7 @@
         // dispatch events
         if (this.isSuccessful())
         {
-          transport.event_success(this);
+          this.event_success(this.getResponseData());
           newState = STATE.READY;
         }
         else
@@ -400,13 +438,13 @@
 
           this.processErrorResponse();
 
-          transport.event_failure(this, this.data.error);
+          this.event_failure(this.data.error);
           newState = STATE.ERROR;
         }
       }
 
       // dispatch complete event
-      transport.event_complete(this);
+      this.event_complete(this);
     }
     else
       newState = STATE.PROCESSING;
@@ -426,7 +464,8 @@
     requestStartTime: 0,
 
     debug: false,
-    transport: null,
+
+    event_readyStateChanged: createRequestEvent('readyStateChanged'),
 
     init: function(){
       AbstractRequest.prototype.init.call(this);
@@ -443,8 +482,7 @@
         return (status == undefined)
             || (status == 0)
             || (status >= 200 && status < 300);
-      } catch(e) {
-      }
+      } catch(e) {}
       return false;
     },
 
@@ -465,11 +503,14 @@
       });
     },
 
-    prepare: Function.$true,
+    prepare: basis.fn.$true,
 
     prepareRequestData: function(requestData){
       var params = [];
       var url = requestData.url;
+
+      // make a copy
+      requestData = objectSlice(requestData);
 
       for (var key in requestData.params)
       {
@@ -522,7 +563,7 @@
       if (ua.test('gecko1.8.1-') && requestData.asynchronous)
         this.xhr = createXmlHttpRequest();
 
-      this.transport.event_start(this);
+      this.event_start();
 
       var xhr = this.xhr;
 
@@ -566,7 +607,7 @@
       // send data
       xhr.send(postBody);
 
-      ;;;if (this.debug) logOutput('Request over, waiting for response');
+      ;;;if (this.debug) basis.dev.log('Request over, waiting for response');
 
       return true;
     },
@@ -579,8 +620,7 @@
       }
     },
 
-    abort: function()
-    {
+    abort: function(){
       if (!this.isIdle())
       {
         this.clearTimeout();
@@ -614,15 +654,13 @@
         }
       });
 
-      this.transport.event_timeout(this);
+      this.event_timeout(this);
       this.abort();
     },
 
     destroy: function(){
       this.abort();
-
-      delete this.xhr;
-      delete this.requestData;
+      this.xhr = null;
 
       AbstractRequest.prototype.destroy.call(this);
     }
@@ -648,8 +686,8 @@
     init: function(){
       AbstractTransport.prototype.init.call(this);
 
-      this.requestHeaders = Object.extend({}, this.requestHeaders);
-      this.params = Object.extend({}, this.params);
+      this.requestHeaders = objectSlice(this.requestHeaders);
+      this.params = objectSlice(this.params);
     },
 
     // params methods
@@ -675,7 +713,7 @@
       if (!url)
         throw new Error('URL is not defined');
 
-      Object.extend(requestData, {
+      extend(requestData, {
         requestUrl: url,
         url: url,
         method: requestData.method || this.method,
@@ -690,28 +728,21 @@
       });
 
       return requestData;
-    },
-
-    get: function(){
-      ;;; if (typeof console != 'undefined') console.warn('basis.net.Transport#get method is deprecated, use basis.net.Transport#request method instead');
-      this.request.apply(this, arguments);
     }
   });
 
 
   //
-  // exports
+  // export names
   //
   module.exports = {
     createEvent: createTransportEvent,
+    transportDispatcher: transportDispatcher,
 
     AbstractRequest: AbstractRequest,
     AbstractTransport: AbstractTransport,
 
     AjaxTransport: AjaxTransport,
     AjaxRequest: AjaxRequest,
-    Transport: AjaxTransport,
-
-    TransportDispatcher: TransportDispatcher
-  }
-
+    Transport: AjaxTransport
+  };

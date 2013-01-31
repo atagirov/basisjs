@@ -151,9 +151,9 @@
   var Modificator = Class(null, {
     className: namespace + '.Modificator',
     thread: null,
-    setter: Function.$null,
+    setter: basis.fn.$null,
     notRevert: false,
-    timeFunction: Function.$self,
+    timeFunction: basis.fn.$self,
 
     init: function(thread, setter, start, end, notInvert){
       if (thread instanceof Thread)
@@ -168,16 +168,13 @@
 
       this.thread.addHandler({
         start: function(){
-          //;;;if (typeof console != 'undefined') console.log(this.className, 'start');
         },
         invert: function(){
           this.start += this.range;
           this.range *= -1;
-          //;;;if (typeof console != 'undefined') console.log(this.className, 'invert');
         },
         change: function(progress){
           this.setter(this.start + this.range * this.timeFunction(progress));
-          //console.log(this.className, progress);
         },
         finish: function(){
           if (!this.notInvert)
@@ -185,7 +182,6 @@
             this.start += this.range;
             this.range *= -1;
           }
-          //;;;if (typeof console != 'undefined') console.log(this.className, 'finish');
         },
         destroy: this.destroy
       }, this);

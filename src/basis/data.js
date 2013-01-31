@@ -25,8 +25,8 @@
   var Class = basis.Class;
   var cleaner = basis.cleaner;
 
-  var values = Object.values;
-  var $self = Function.$self;
+  var values = basis.object.values;
+  var $self = basis.fn.$self;
 
   var EventObject = basis.event.EventObject;
   var createEvent = basis.event.create;
@@ -77,7 +77,7 @@
     },
 
     getList: function(){
-      return Object.values(STATE_EXISTS);
+      return values(STATE_EXISTS);
     }
   };
 
@@ -282,7 +282,7 @@
     * subscription on).
     * @type {boolean}
     */
-    active: false,
+    canSetDelegate: true,
 
    /**
     * Fires when state of subscription was changed.
@@ -685,8 +685,11 @@
     * @return {boolean} Returns current delegate object.
     */
     setDelegate: function(newDelegate){
+      if (!this.canSetDelegate)
+        return false;
+
       // check is newDelegate can be linked to this object as delegate
-      if (this.canHaveDelegate && newDelegate && newDelegate instanceof DataObject)
+      if (newDelegate && newDelegate instanceof DataObject)
       {
         // check for connected prevents from linking to objects
         // that has this object in delegate chains
@@ -863,6 +866,16 @@
     }
   });
 
+
+  //
+  // Slot
+  //
+
+  var Slot = Class(DataObject, {
+    className: namespace('Slot')
+  });
+
+
   //
   // KeyObjectMap
   //
@@ -877,7 +890,7 @@
   * @class
   */
   var KeyObjectMap = Class(null, {
-    className: namespace + '.KeyObjectMap',
+    className: namespace('KeyObjectMap'),
 
     itemClass: DataObject,
     keyGetter: $self,
@@ -959,7 +972,7 @@
   * @class
   */
   var AbstractDataset = Class(DataObject, {
-    className: namespace + '.AbstractDataset',
+    className: namespace('AbstractDataset'),
 
    /**
     * Default state for set is undefined. It useful to trigger dataset update
@@ -1205,7 +1218,7 @@
   * @class
   */
   var Dataset = Class(AbstractDataset, {
-    className: namespace + '.Dataset',
+    className: namespace('Dataset'),
 
    /**
     * @inheritDoc
@@ -1576,6 +1589,7 @@
     AbstractData: AbstractData,
     Object: DataObject,
     DataObject: DataObject,
+    Slot: Slot,
 
     KeyObjectMap: KeyObjectMap,
 

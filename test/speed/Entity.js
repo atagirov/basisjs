@@ -1,4 +1,5 @@
 
+    basis.require('basis.date');
     basis.require('basis.dom');
     basis.require('basis.dom.event');
     basis.require('basis.data');
@@ -12,7 +13,7 @@
     var Data = basis.data;
     var nsEntity = basis.entity;
 
-    var getter = Function.getter;
+    var getter = basis.getter;
     var arrayFrom = basis.array.from;
 
     var eventStat = {};
@@ -56,23 +57,23 @@
       return res;
     }
 
-    Function.$nullOrValue = function(value){
+    basis.fn.$nullOrValue = function(value){
       return value == null ? null : value;
     };
 
-    Function.$nullOrString = function(value){
+    basis.fn.$nullOrString = function(value){
       return value == null ? null : String(value);
     };
 
-    Function.$nullOrBoolean = function(value){
+    basis.fn.$nullOrBoolean = function(value){
       return value == null ? null : Boolean(value);
     };
 
-    Function.$date = function(value){
-      return value instanceof Date || value == null ? value : Date.fromISOString(value);
+    basis.fn.$date = function(value){
+      return value instanceof Date || value == null ? value : basis.date.fromISOString(value);
     };
 
-    Function.$nullOrArray = function(value){
+    basis.fn.$nullOrArray = function(value){
       return value == null || value.length == 0 ? null : arrayFrom(value);
     };
 
@@ -80,7 +81,7 @@
       name: 'User',
       id: 'UserId',
       fields: {
-        UserId: nsEntity.IntId || Function.def(Number, null, isNaN),
+        UserId: nsEntity.IntId || basis.fn.def(Number, null, isNaN),
         Title: String,
         Value: Number
       }
@@ -90,7 +91,7 @@
       name: 'Currency',
       id: 'CurrencyId',
       fields: {
-        CurrencyId: nsEntity.IntId || Function.def(Number, null, isNaN),
+        CurrencyId: nsEntity.IntId || basis.fn.def(Number, null, isNaN),
         Code: String,
         Title: String
       }
@@ -100,12 +101,12 @@
       name: 'Transfer',
       id: 'TransferId',
       fields: {
-        TransferId: nsEntity.IntId || Function.def(Number, null, isNaN),
+        TransferId: nsEntity.IntId || basis.fn.def(Number, null, isNaN),
         User: User,
         Amount: Number,
         Currency: Currency,
         Value: Number,
-        CreateDate: Function.$date
+        CreateDate: basis.fn.$date
       }
     });
     Currency.entityType.entityClass.extend({
