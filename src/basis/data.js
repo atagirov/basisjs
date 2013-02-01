@@ -282,7 +282,7 @@
     * subscription on).
     * @type {boolean}
     */
-    active: true,
+    active: false,
 
    /**
     * Fires when state of subscription was changed.
