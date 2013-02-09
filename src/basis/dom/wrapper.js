@@ -47,8 +47,6 @@
   // Main part
   //
 
-  // Module exceptions
-
   /** @const */ var EXCEPTION_CANT_INSERT = namespace + ': Node can\'t be inserted at specified point in hierarchy';
   /** @const */ var EXCEPTION_NODE_NOT_FOUND = namespace + ': Node was not found';
   /** @const */ var EXCEPTION_BAD_CHILD_CLASS = namespace + ': Child node has wrong class';
@@ -56,14 +54,19 @@
   /** @const */ var EXCEPTION_DATASOURCE_CONFLICT = namespace + ': Operation is not allowed because node is under dataSource control';
   /** @const */ var EXCEPTION_PARENTNODE_OWNER_CONFLICT = namespace + ': Node can\'t has owner and parentNode';
 
-  var childNodesDatasetMap = {};
-
-  var DELEGATE = {
+  /** @const */ var DELEGATE = {
     ANY: true,
     NONE: false,
     PARENT: 'parent',
     OWNER: 'owner'
   };
+
+  var childNodesDatasetMap = {};
+
+
+  //
+  // sorting
+  //
 
   function sortingSearch(node){
     return node.sortingValue || 0; // it's important return a zero when sortingValue is undefined,
@@ -91,6 +94,10 @@
     );
   }
 
+
+  //
+  // selection
+  //
 
   function updateNodeContextSelection(root, oldSelection, newSelection, rootUpdate, ignoreRootSelection){
     // exit if no changes
@@ -158,6 +165,11 @@
       cursor.contextSelection = newSelection;
     }
   }
+
+
+  //
+  // disabled
+  //
 
   function updateNodeDisableContext(node, disabled){
     if (node.contextDisabled != disabled)
@@ -1232,16 +1244,16 @@
 
       // search for insert point
       var isInside = newChild.parentNode === this;
-      var currentNewChildGroup = newChild.groupNode;
+      var childNodes = this.childNodes;
       var grouping = this.grouping;
+      var groupNodes;
+      var currentNewChildGroup = newChild.groupNode;
+      var group = null;
       var sorting = this.sorting;
       var sortingDesc;
-      var childNodes = this.childNodes;
-      var newChildValue;
-      var groupNodes;
-      var group = null;
-      var pos = -1;
       var correctSortPos = false;
+      var newChildValue;
+      var pos = -1;
       var nextSibling;
       var prevSibling;
 
@@ -1288,13 +1300,13 @@
 
         // optimization: test node position, possible it on right place
         if (currentNewChildGroup === group)
-          if (correctSortPos || (isInside && nextSibling === refChild))
+          if (correctSortPos || (sorting === nullGetter && nextSibling === refChild))
             return newChild;
 
         // calculate newChild position
         if (sorting !== nullGetter)
         {
-          if (correctSortPos)
+          if (currentNewChildGroup === group && correctSortPos)
           {
             if (nextSibling && nextSibling.groupNode === group)
               pos = groupNodes.indexOf(nextSibling);
@@ -2273,15 +2285,10 @@
 
     autoDestroyWithNoOwner: true,
     autoDestroyEmptyGroups: true,
-    //titleGetter: getter('data.title'),
     groupGetter: nullGetter,
 
     childClass: PartitionNode,
     childFactory: function(config){
-      //return new this.childClass(complete(config, {
-      //  titleGetter: this.titleGetter,
-      //  autoDestroyIfEmpty: this.dataSource ? false : this.autoDestroyEmptyGroups
-      //}));
       return new this.childClass(complete({
         autoDestroyIfEmpty: this.dataSource ? false : this.autoDestroyEmptyGroups
       }, config));
@@ -2325,6 +2332,20 @@
       }
 
       return group || this.nullGroup;
+    },
+
+    setDataSource: function(dataSource){
+      var curDataSource = this.dataSource;
+
+      DomMixin.setDataSource.call(this, dataSource);
+
+      var owner = this.owner;
+      if (owner && this.dataSource !== curDataSource)
+      {
+        var nodes = arrayFrom(owner.childNodes);
+        for (var i = nodes.length - 1; i >= 0; i--)
+          owner.insertBefore(nodes[i], nodes[i + 1]);
+      }
     },
 
    /**

@@ -55,7 +55,7 @@
       if (template)
       {
         var matchBinding = template.getBinding(this.data.obj.prototype.binding);
-        binding = Object.iterate(this.data.obj.prototype.binding, function(key, value){
+        binding = basis.object.iterate(this.data.obj.prototype.binding, function(key, value){
           return typeof value == 'object' ? {
             data: {
               name: key,
@@ -257,7 +257,7 @@
       this.updateBind('externalFileUrl');
 
       if (template)
-        template.docsCache_ = Array.from(this.childNodes);
+        template.docsCache_ = basis.array.from(this.childNodes);
 
       var oldTemplate = this.templateView;
       this.templateView = template;

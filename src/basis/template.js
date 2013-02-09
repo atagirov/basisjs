@@ -412,7 +412,7 @@
       return array;
     }
 
-    function attrs(token, declToken){
+    function processAttr(name, value){
       function buildExpression(parts){
         var bindName;
         var names = [];
@@ -441,62 +441,41 @@
         return [names, expression];
       }
 
-      var attrs = token.attrs;
-      var result = [];
-      var bindings;
+      var bindings = 0;
       var parts;
       var m;
 
-      for (var i = 0, attr; attr = attrs[i]; i++)
+      // other attributes
+      if (value)
       {
-        bindings = 0;
-
-        // process special attributes (basis namespace)
-        if (attr.prefix == 'b')
+        switch (name)
         {
-          switch (attr.name)
-          {
-            case 'ref':
-              var refs = (attr.value || '').trim().split(/\s+/);
-              for (var j = 0; j < refs.length; j++)
-                addTokenRef(declToken, refs[j]);
-            break;
-          }
+          case 'class':
+            if (parts = value.match(CLASS_ATTR_PARTS))
+            {
+              var newValue = [];
 
-          continue;
-        }
-
-        // other attributes
-        if (attr.value)
-        {
-          switch (attr.name)
-          {
-            case 'class':
-              if (parts = attr.value.match(CLASS_ATTR_PARTS))
-              {
-                var newValue = [];
-
-                bindings = [];
-
-                for (var j = 0, part; part = parts[j]; j++)
-                {
-                  if (m = part.match(CLASS_ATTR_BINDING))
-                    bindings.push([m[1] || '', m[2]]);
-                  else
-                    newValue.push(part);
-                }
-                
-                // set new value
-                attr.value = newValue.join(' ');
-              }
-            break;
-
-            case 'style':
-              var props = [];
-
-              parts = attr.value.match(STYLE_ATTR_PARTS);
               bindings = [];
 
+              for (var j = 0, part; part = parts[j]; j++)
+              {
+                if (m = part.match(CLASS_ATTR_BINDING))
+                  bindings.push([m[1] || '', m[2]]);
+                else
+                  newValue.push(part);
+              }
+              
+              // set new value
+              value = newValue.join(' ');
+            }
+            break;
+
+          case 'style':
+            var props = [];
+
+            bindings = [];
+            if (parts = value.match(STYLE_ATTR_PARTS))
+            {
               for (var j = 0, part; part = parts[j]; j++)
               {
                 var m = part.match(STYLE_PROPERTY);
@@ -513,29 +492,62 @@
                 else
                   props.push(propertyName + ': ' + untoken(value));
               }
+            }
+            else
+            {
+              ;;;if (/\S/.test(value)) basis.dev.warn('Bad value for style attribute (value ignored):', value);
+            }
 
-              props.push('');
-              attr.value = props.join(';');
+            props.push('');
+            value = props.join(';');
             break;
 
-            default:
-              parts = attr.value.split(ATTR_BINDING);
-              if (parts.length > 1)
-                bindings = buildExpression(parts);
-              else
-                attr.value = untoken(attr.value);
+          default:
+            parts = value.split(ATTR_BINDING);
+            if (parts.length > 1)
+              bindings = buildExpression(parts);
+            else
+              value = untoken(value);
+        }
+      }
+
+      if (bindings && !bindings.length)
+        bindings = 0;
+
+      return {
+        binding: bindings,
+        value: value
+      };   
+    }
+
+    function attrs(token, declToken){
+      var attrs = token.attrs;
+      var result = [];
+
+      for (var i = 0, attr; attr = attrs[i]; i++)
+      {
+        // process special attributes (basis namespace)
+        if (attr.prefix == 'b')
+        {
+          switch (attr.name)
+          {
+            case 'ref':
+              var refs = (attr.value || '').trim().split(/\s+/);
+              for (var j = 0; j < refs.length; j++)
+                addTokenRef(declToken, refs[j]);
+            break;
           }
+
+          continue;
         }
 
-        if (bindings && !bindings.length)
-          bindings = 0;
-
+        var parsed = processAttr(attr.name, attr.value);
         result.push([
           2,                      // TOKEN_TYPE = 0
-          bindings,               // TOKEN_BINDINGS = 1
+          parsed.binding,         // TOKEN_BINDINGS = 1
           refList(attr),          // TOKEN_REFS = 2
           name(attr),             // ATTR_NAME = 2
-          attr.value              // ATTR_VALUE = 3
+          parsed.value            // ATTR_VALUE = 3
         ]);
       }
 
@@ -780,14 +792,38 @@
                             case 'append-class':
                               modifyAttr(child, 'class', function(params, attrs, attrToken){
                                 //attr.value = (attr.value ? ' ' : '') + (params.value || '');
-                                attrToken[ATTR_VALUE] = (attrToken[ATTR_VALUE] + ' ' + (params.value || '')).trim();
-                                if (!attrToken[ATTR_VALUE])
+                                var parsed = processAttr(params.name, params.value);
+
+                                if (!parsed.binding && !parsed.value)
+                                {
                                   attrs.remove(attrToken);
+                                  return;
+                                }
+
+                                if (parsed.binding)
+                                {
+                                  if (attrToken[TOKEN_BINDINGS])
+                                    attrToken[TOKEN_BINDINGS].push.apply(attrToken[TOKEN_BINDINGS], parsed.binding);
+                                  else
+                                    attrToken[TOKEN_BINDINGS] = parsed.binding;
+                                }
+
+                                if (parsed.value)
+                                  attrToken[ATTR_VALUE] += (attrToken[ATTR_VALUE] ? ' ' : '') + parsed.value;
                               });
                             break;
                             case 'set-class':
                               modifyAttr(child, 'class', function(params, attrs, attr){
-                                attr.value = params.value || '';
+                                var parsed = processAttr(params.name, params.value);
+
+                                if (!parsed.binding && !parsed.value)
+                                {
+                                  attrs.remove(attrToken);
+                                  return;
+                                }
+
+                                attrToken[TOKEN_BINDINGS] = parsed.binding;
+                                attrToken[ATTR_VALUE] = parsed.value;
                               }, true);
                             break;
                             case 'remove-class':
@@ -1891,7 +1927,7 @@
     Theme: Theme,
     theme: getTheme,
     getThemeList: function(){
-      return Object.keys(themes);
+      return basis.object.keys(themes);
     },
     currentTheme: function(){
       return themes[currentThemeName].theme;
@@ -1904,6 +1940,6 @@
 
     get: getSourceByPath,
     getPathList: function(){
-      return Object.keys(sourceByPath);
+      return basis.object.keys(sourceByPath);
     }
   };

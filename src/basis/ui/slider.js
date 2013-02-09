@@ -297,8 +297,10 @@
 
       // add drag possibility for slider
       this.dde = new DragDropElement({
-        handler: DRAGDROP_HANDLER,
-        handlerContext: this
+        handler: {
+          context: this,
+          callbacks: DRAGDROP_HANDLER
+        }
       });
     },
 
@@ -346,7 +348,7 @@
             if (typeof layer != 'object')
               layer = { count: layer };
 
-            var layerConfig = Object.extend({
+            var layerConfig = basis.object.extend({
               captionFormat: this.captionFormat,
               owner_: this
             }, layer);
